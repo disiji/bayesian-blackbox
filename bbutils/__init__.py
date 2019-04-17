@@ -1,5 +1,4 @@
 import numpy as np
-from scipy.stats import beta
 
 
 class GenerativeModel:
@@ -30,5 +29,5 @@ class BetaBernoulli:
 
     def sample(self):
         """Draw sample thetas from the posterior."""
-        theta = [beta.rvs(self._params[i,0], self._params[i,1]) for i in range(self._k)]
+        theta = np.random.beta(self._params[:,0], self._params[:,1])
         return np.array(theta)
