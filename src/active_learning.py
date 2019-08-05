@@ -87,6 +87,7 @@ def top_two_thompson_sampling(model: BetaBernoulli, deques: List[deque], mode: s
     else:
         while True:
             category_2 = thompson_sampling(model, deques, mode, metric, confidence_k)
+            print(category_1, category_2)
             if category_2 != category_1:
                 return category_2
 
@@ -112,18 +113,20 @@ def get_samples(categories: List[int], observations: List[bool], confidences: Li
     :return:
     """
 
-    choices = np.zeros((num_classes, n))
-    thetas = np.zeros((num_classes, n))
-
+    # prepare model, deques, thetas, choices
+    model = BetaBernoulli(num_classes, prior)
     deques = [deque() for _ in range(num_classes)]
     for category, observation in zip(categories, observations):
         deques[category].append(observation)
     for _deque in deques:
         random.shuffle(_deque)
-    model = BetaBernoulli(num_classes, prior)
+    choices = np.zeros((num_classes, n))
+    thetas = np.zeros((num_classes, n))
+
     confidence_k = _get_confidence_k(categories, confidences, num_classes)
 
     for i in range(n):
+
         # get sample
         if sample_method == "ts":
             category = thompson_sampling(model, deques, mode, metric, confidence_k)
@@ -131,6 +134,7 @@ def get_samples(categories: List[int], observations: List[bool], confidences: Li
             category = random_sampling(model, deques)
         elif sample_method == "ttts":
             category = top_two_thompson_sampling(model, deques, mode, metric, confidence_k, beta=0.5)
+
         # update model, deques, thetas, choices
         model.update(category, deques[category].pop())
         thetas[:, i] = model._params[:, 0] / (model._params[:, 0] + model._params[:, 1])
