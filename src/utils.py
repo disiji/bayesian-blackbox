@@ -3,9 +3,8 @@ from collections import deque
 from copy import deepcopy
 
 import numpy as np
-from scipy.stats import entropy
 from scipy.stats import beta
-
+from scipy.stats import entropy
 
 
 def prepare_deques(categories, observations, num_classes):
@@ -22,7 +21,6 @@ def prepare_deques(categories, observations, num_classes):
     for _deque in deques:
         random.shuffle(_deque)
     return deques
-
 
 
 ################### active overall accuracy estimation
@@ -94,7 +92,7 @@ class BetaBernoulli:
         if prior is None:
             self._params = np.ones((k, 2)) * 0.5
         else:
-            self._params = prior
+            self._params = np.copy(prior)
 
     def update(self, category: int, observation: bool):
         """Updates the posterior of the Beta-Bernoulli model."""
@@ -102,6 +100,10 @@ class BetaBernoulli:
             self._params[category, 0] += 1
         else:
             self._params[category, 1] += 1
+
+    @property
+    def theta(self):
+        return self._params[:, 0] / (self._params[:, 0] + self._params[:, 1])
 
     def sample(self):
         """Draw sample thetas from the posterior."""
