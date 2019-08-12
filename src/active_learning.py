@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from utils import BetaBernoulli
+import pickle
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -78,7 +79,7 @@ def thompson_sampling(model: BetaBernoulli, deques: List[deque], mode: str, metr
 
 
 def top_two_thompson_sampling(model: BetaBernoulli, deques: List[deque], mode: str, metric: str,
-                              confidence_k: np.ndarray = None, max_ttts_trial= 50, beta: float = 0.5) -> int:
+                              confidence_k: np.ndarray = None, max_ttts_trial=50, beta: float = 0.5) -> int:
     category_1 = thompson_sampling(model, deques, mode, metric, confidence_k)
     # toss a coin with probability beta
     B = np.random.binomial(1, beta)
@@ -104,29 +105,20 @@ def random_sampling(deques: List[deque]) -> int:
             return category
 
 
-def get_samples(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int, n: int,
-                sample_method: str, mode: str, metric: str, prior=None, ttts_beta=0.5, max_ttts_trial=50) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    :param num_classes:
-    :param n:
-    :param categories:
-    :param observations:
-    :param sample_method: "random", "ts", "ttts"
-    :param mode: str, "min" or "max"
-    :param metric: str, "accuracy" and "calibration bias"
-    :return:
-    """
-
+def get_samples(categories: List[int], observations: List[bool], confidences: List[float],
+                num_classes: int, n: int, sample_method: str, mode: str, metric: str, prior=None, ttts_beta=0.5,
+                max_ttts_trial=50, random_seed=0) -> Tuple[np.ndarray, np.ndarray]:
     # prepare model, deques, thetas, choices
+    random.seed(random_seed)
     model = BetaBernoulli(num_classes, prior)
     deques = [deque() for _ in range(num_classes)]
     for category, observation in zip(categories, observations):
         deques[category].append(observation)
     for _deque in deques:
         random.shuffle(_deque)
-    choices = np.zeros((num_classes, n))
-    thetas = np.zeros((num_classes, n))
+    success = np.zeros((n,))
 
+    ground_truth = get_ground_truth(categories, observations, confidences, num_classes, metric, mode)
     confidence_k = _get_confidence_k(categories, confidences, num_classes)
 
     for i in range(n):
@@ -140,52 +132,17 @@ def get_samples(categories: List[int], observations: List[bool], confidences: Li
 
         # update model, deques, thetas, choices
         model.update(category, deques[category].pop())
-        thetas[:, i] = model.theta
-        if i > 0:
-            choices[:, i] = choices[:, i - 1]
-        choices[category, i] += 1
-    return choices, thetas
 
+        if metric == "accuracy":
+            metric_val = model.theta
+        elif metric == 'calibration_bias':
+            metric_val = confidence_k - model.theta
+        if mode == 'min':
+            success[i] = (np.argmin(metric_val) == ground_truth) * 1.0
+        elif mode == 'max':
+            success[i] = (np.argmax(metric_val) == ground_truth) * 1.0
 
-def comparison_plot(random_thetas: np.ndarray, active_thetas: np.ndarray, ground_truth: int, confidence_k: np.ndarray,
-                    mode: str, metric: str, num_runs: int, dataset: str, active_type: str) -> None:
-    """
-
-    :param random_thetas: (num_runs, num_classes, n)
-    :param active_thetas: (num_runs, num_classes, n)
-    :param ground_truth:
-    :param mode:
-    :param metric:
-    :param num_runs:
-    :param dataset:
-    :param active_type:
-    :return:
-    """
-    figname = "../figures/active_learning/%s_%s_%s_runs_%d_%s.pdf" % (dataset, metric, mode, num_runs, active_type)
-    if metric == "accuracy":
-        random_metric_val = random_thetas
-        active_metric_val = active_thetas
-    elif metric == 'calibration_bias':
-        random_metric_val = confidence_k[None, :, None] - random_thetas
-        active_metric_val = confidence_k[None, :, None] - active_thetas
-    if mode == 'min':
-        random_success = np.mean((np.argmin(random_metric_val, axis=1) == ground_truth) * 1.0, axis=0)
-        active_success = np.mean((np.argmin(active_metric_val, axis=1) == ground_truth) * 1.0, axis=0)
-    elif mode == 'max':
-        random_success = np.mean((np.argmax(random_metric_val, axis=1) == ground_truth) * 1.0, axis=0)
-        active_success = np.mean((np.argmax(active_metric_val, axis=1) == ground_truth) * 1.0, axis=0)
-
-    # If labels are getting cut off make the figsize smaller
-    plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
-    plt.plot(active_success, label='active')
-    plt.plot(random_success, label='random')
-    plt.xlabel('Time')
-    plt.ylabel('Success Rate')
-    plt.legend()
-    plt.yticks(fontsize=FONT_SIZE)
-    plt.xticks(fontsize=FONT_SIZE)
-    plt.ylim(0.0, 1.0)
-    plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
+    return success
 
 
 def _get_confidence_k(categories: List[int], confidences: List[float], num_classes: int) -> np.ndarray:
@@ -233,7 +190,21 @@ def get_ground_truth(categories: List[int], observations: List[bool], confidence
         return np.argmin(metric_val)
 
 
-def main(RUNS, MODE, METRIC, DATASET, ACTIVE_TYPE, TTTS_BETA, MAX_TTTS_TRIAL):
+def comparison_plot(success_rate_dict, figname) -> None:
+    # If labels are getting cut off make the figsize smaller
+    plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
+    for method_name, success_rate in success_rate_dict.items():
+        plt.plot(success_rate, label=method_name)
+    plt.xlabel('Time')
+    plt.ylabel('Success Rate')
+    plt.legend()
+    plt.yticks(fontsize=FONT_SIZE)
+    plt.xticks(fontsize=FONT_SIZE)
+    plt.ylim(0.0, 1.0)
+    plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
+
+
+def main(RUNS, MODE, METRIC, DATASET, TTTS_BETA, MAX_TTTS_TRIAL):
     if DATASET == 'cifar100':
         # datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
         datafile = '../data/cifar100/predictions.txt'
@@ -257,41 +228,68 @@ def main(RUNS, MODE, METRIC, DATASET, ACTIVE_TYPE, TTTS_BETA, MAX_TTTS_TRIAL):
     N = len(observations)
 
     # get samples for multiple runs
-    active_choices = np.zeros((RUNS, NUM_CLASSES, N))
-    active_thetas = np.zeros((RUNS, NUM_CLASSES, N))
-    random_choices = np.zeros((RUNS, NUM_CLASSES, N))
-    random_thetas = np.zeros((RUNS, NUM_CLASSES, N))
+    # returns one thing: success or not
+    active_ts_success = np.zeros((N,))
+    active_ttts_success = np.zeros((N,))
+    random_success = np.zeros((N,))
     for r in range(RUNS):
-        active_choices[r, :, :], active_thetas[r, :, :] = get_samples(categories, observations, confidences,
-                                                                      NUM_CLASSES, N,
-                                                                      sample_method=ACTIVE_TYPE, mode=MODE,
-                                                                      metric=METRIC,
-                                                                      prior=PRIOR, ttts_beta = TTTS_BETA, max_ttts_trial = MAX_TTTS_TRIAL)
-        random_choices[r, :, :], random_thetas[r, :, :] = get_samples(categories, observations, confidences,
-                                                                      NUM_CLASSES, N,
-                                                                      sample_method='random', mode=MODE, metric=METRIC,
-                                                                      prior=PRIOR)
+        random_success += get_samples(categories,
+                                      observations,
+                                      confidences,
+                                      NUM_CLASSES, N,
+                                      sample_method='random',
+                                      mode=MODE,
+                                      metric=METRIC,
+                                      prior=PRIOR,
+                                      random_seed=r)
+        active_ts_success += get_samples(categories,
+                                         observations,
+                                         confidences,
+                                         NUM_CLASSES,
+                                         N,
+                                         sample_method='ts',
+                                         mode=MODE,
+                                         metric=METRIC,
+                                         prior=PRIOR, ttts_beta=TTTS_BETA,
+                                         max_ttts_trial=MAX_TTTS_TRIAL,
+                                         random_seed=r)
+        active_ttts_success += get_samples(categories,
+                                           observations,
+                                           confidences,
+                                           NUM_CLASSES,
+                                           N,
+                                           sample_method='ttts',
+                                           mode=MODE,
+                                           metric=METRIC,
+                                           prior=PRIOR, ttts_beta=TTTS_BETA,
+                                           max_ttts_trial=MAX_TTTS_TRIAL,
+                                           random_seed=r)
+
+    success_rate_dict = {
+        'random': random_success / RUNS,
+        'TS': active_ts_success / RUNS,
+        'TTTS': active_ttts_success / RUNS,
+    }
+    print(success_rate_dict)
+    output_name = "../output/active_learning/%s_%s_%s_runs_%d.pkl" % (DATASET, METRIC, MODE, RUNS)
+    pickle.dump(success_rate_dict, open(output_name, "wb" ) )
 
     # evaluation
-    ground_truth = get_ground_truth(categories, observations, confidences, NUM_CLASSES, METRIC, MODE)
-    confidence_k = _get_confidence_k(categories, confidences, NUM_CLASSES)
-    comparison_plot(random_thetas, active_thetas, ground_truth, confidence_k, MODE, METRIC, RUNS, DATASET, ACTIVE_TYPE)
+    figname = "../figures/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, METRIC, MODE, RUNS)
+    comparison_plot(success_rate_dict, figname)
 
 
 if __name__ == "__main__":
 
     # configs
     RUNS = 100
-    # MODE = 'min'  # 'min' or 'max'
-    # METRIC = 'accuracy'  # 'accuracy' or 'calibration_bias'
-    # DATASET = 'cifar100'  # 'cifar100', 'svhn', 'imagenet', or 'imagenet2_topimages'
-    ACTIVE_TYPE = 'ttts'  # 'ts' or 'ttts'
+    # DATASET = 'cifar100'  # 'cifar100', 'svhn', 'imagenet', 'imagenet2_topimages
     MAX_TTTS_TRIAL = 50
     TTTS_BETA = 0.5
     # main(RUNS, MODE, METRIC, DATASET, ACTIVE_TYPE)
 
-    for DATASET in ['cifar100', 'svhn']:
+    for DATASET in ['cifar100', 'svhn', 'imagenet2_topimages', 'imagenet']:
         for METRIC in ['accuracy', 'calibration_bias']:
             for MODE in ['min', 'max']:
                 print(DATASET, METRIC, MODE, '...')
-                main(RUNS, MODE, METRIC, DATASET, ACTIVE_TYPE, TTTS_BETA, MAX_TTTS_TRIAL)
+                main(RUNS, MODE, METRIC, DATASET, TTTS_BETA, MAX_TTTS_TRIAL)
