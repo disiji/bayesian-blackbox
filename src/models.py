@@ -113,12 +113,8 @@ class DirichletMultinomialCost(Model):
 
     def mpe(self, n_samples: int = 1000) -> np.ndarray:
         """Mean posterior estimate of expected costs, computed using Monte Carlo sampling"""
-        num_classes = self._alphas.shape[0]
-        mpe = np.zeros((num_classes,))
-        for i, alpha in enumerate(self._alphas):
-            samples = np.random.dirichlet(alpha, size=(n_samples,))
-            costs = self._costs[i].reshape(1, -1)
-            expected_cost = (samples * self._costs[i]).sum(-1).mean()
-            mpe[i] = expected_cost
-        return mpe
+        z = self._alphas.sum(axis=-1, keepdims=True)
+        expected_probs = self._alphas / z
+        expected_costs = (self._costs * expected_probs).sum(axis=-1)
+        return expected_costs
 

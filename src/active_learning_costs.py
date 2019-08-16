@@ -15,8 +15,8 @@ from models import DirichletMultinomialCost, Model
 
 logger = logging.getLogger(__name__)
 
-LOG_FREQ = 10
-N_SIMULATIONS = 100
+LOG_FREQ = 25
+N_SIMULATIONS = 20
 
 
 class Dataset:
@@ -241,11 +241,12 @@ def main(args: argparse.Namespace) -> None:
         if args.superclass:
             costs = np.zeros((dataset.num_classes, 3))
             costs[:, 1] = 1
-            costs[:, 2] = 2
+            costs[:, 2] = args.k
         else:
             # Randomly fill cost matrix with integers between 1 and 5 w/ zeros on diagonal.
-            costs = np.random.randint(1, 5, size=(dataset.num_classes, dataset.num_classes))
-            # costs = np.ones((dataset.num_classes, dataset.num_classes))
+            # costs = np.random.randint(1, 5, size=(dataset.num_classes, dataset.num_classes))
+            costs = np.ones((dataset.num_classes, dataset.num_classes))
+            costs[:, -1] = args.k * costs[:, -1]
             np.fill_diagonal(costs, 0)
     else:
         costs = np.load(args.cost_matrix)
@@ -266,15 +267,20 @@ def main(args: argparse.Namespace) -> None:
     random_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
     active_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
 
+    if args.superclass:
+        pseudocount = 3
+    else:
+        pseudocount = dataset.num_classes
+
     for i in tqdm(range(N_SIMULATIONS)):
         # Random results
-        model = DirichletMultinomialCost(3 * dataset.confusion_prior, costs)
+        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
         random_results[i] = select_and_label(dataset=dataset,
                                              model=model,
                                              choice_fn=random_choice_fn)
 
         alphas = np.ones((dataset.num_classes, dataset.num_classes))
-        model = DirichletMultinomialCost(10 * dataset.confusion_prior, costs)
+        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
         active_results[i] = select_and_label(dataset=dataset,
                                              model=model,
                                              choice_fn=max_choice_fn)
@@ -295,6 +301,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
                         help='path to a serialized numpy array containng the cost matrix')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
+    parser.add_argument('-k', type=float, default=2, help='relative cost')
     parser.add_argument('--superclass', action='store_true')
     args, _ = parser.parse_known_args()
 
