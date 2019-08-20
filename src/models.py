@@ -100,21 +100,35 @@ class DirichletMultinomialCost(Model):
         """Update the posterior of the model."""
         self._alphas[predicted_class, true_class] += 1
 
-    def sample(self) -> np.ndarray:
-        """Draw sample expected costs from the posterior."""
+    def sample(self, n_samples: int = 1) -> np.ndarray:
+        """Draw sample expected costs from the posterior.
+
+        Parameters
+        ==========
+        n_samples : int
+            Number of times to sample from posterior. Default: 1.
+
+        Returns
+        =======
+        An (n, n_samples) array of expected costs. If n_samples == 1 then last dimension is squeezed.
+        """
         # Draw multinomial probabilities (e.g. the confusion probabilities) from posterior
-        posterior_draw = np.zeros_like(self._alphas)
-        for i, alpha in enumerate(self._alphas):
-            posterior_draw[i] = np.random.dirichlet(alpha)
+        if n_samples == 1:
+            posterior_draw = np.zeros_like(self._alphas)
+            for i, alpha in enumerate(self._alphas):
+                posterior_draw[i] = np.random.dirichlet(alpha)
+        else:
+            posterior_draw = np.zeros((n_samples, *self._alphas.shape))
+            for i, alpha in enumerate(self._alphas):
+                posterior_draw[:, i, :] = np.random.dirichlet(alpha, size=(n_samples,))
 
         # Compute expected costs of each predicted class
-        expected_costs = (self._costs * posterior_draw).sum(axis=-1)
-        return expected_costs
+        expected_costs = (np.expand_dims(self._costs, 0) * posterior_draw).sum(axis=-1)
+        return expected_costs.squeeze()
 
-    def mpe(self, n_samples: int = 1000) -> np.ndarray:
+    def mpe(self) -> np.ndarray:
         """Mean posterior estimate of expected costs, computed using Monte Carlo sampling"""
         z = self._alphas.sum(axis=-1, keepdims=True)
         expected_probs = self._alphas / z
         expected_costs = (self._costs * expected_probs).sum(axis=-1)
         return expected_costs
-

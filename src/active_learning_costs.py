@@ -15,8 +15,8 @@ from models import DirichletMultinomialCost, Model
 
 logger = logging.getLogger(__name__)
 
-LOG_FREQ = 25
-N_SIMULATIONS = 20
+LOG_FREQ = 1
+N_SIMULATIONS = 100
 
 
 class Dataset:
@@ -62,7 +62,7 @@ class Dataset:
 
     @property
     def confusion_probs(self) -> np.ndarray:
-        arr = confusion_matrix(self.labels, self.predictions)
+        arr = confusion_matrix(self.labels, self.predictions).transpose()
         return arr / arr.sum(axis=-1, keepdims=True)
 
     @property
@@ -88,7 +88,6 @@ class SuperclassDataset:
         self.reverse_lookup = defaultdict(list)
         for key, value in self.superclass_lookup.items():
             self.reverse_lookup[value].append(key)
-
 
     def __len__(self):
         return self.labels.shape[0]
@@ -216,6 +215,9 @@ def select_and_label(dataset: Dataset,
             index = i // LOG_FREQ - 1
             mpe[index] = model.mpe()
 
+    # In case we're one short
+    mpe[-1] = model.mpe()
+
     return mpe
 
 
@@ -230,6 +232,9 @@ def pretty_print(arr):
 def main(args: argparse.Namespace) -> None:
     # Set random seed to ensure reproducibility of experiments
     np.random.seed(args.seed)
+
+    if not args.output.exists():
+        args.output.mkdir()
 
     # Load the dataset and cost matrix
     if args.superclass:
@@ -266,6 +271,7 @@ def main(args: argparse.Namespace) -> None:
     # Run experiments...
     random_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
     active_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
+    active_informed_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
 
     if args.superclass:
         pseudocount = 3
@@ -273,36 +279,57 @@ def main(args: argparse.Namespace) -> None:
         pseudocount = dataset.num_classes
 
     for i in tqdm(range(N_SIMULATIONS)):
-        # Random results
-        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
+        alphas = np.ones((dataset.num_classes, pseudocount))
+        model = DirichletMultinomialCost(alphas, costs)
         random_results[i] = select_and_label(dataset=dataset,
                                              model=model,
                                              choice_fn=random_choice_fn)
+        model.mpe()
 
-        alphas = np.ones((dataset.num_classes, dataset.num_classes))
-        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
+        alphas = np.ones((dataset.num_classes, pseudocount))
+        model = DirichletMultinomialCost(alphas, costs)
         active_results[i] = select_and_label(dataset=dataset,
                                              model=model,
                                              choice_fn=max_choice_fn)
 
+        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
+        active_informed_results[i] = select_and_label(dataset=dataset,
+                                                      model=model,
+                                                      choice_fn=max_choice_fn)
+
     random_success = (np.argmax(random_results, axis=-1) == highest_cost_class).mean(axis=0)
     active_success = (np.argmax(active_results, axis=-1) == highest_cost_class).mean(axis=0)
+    active_informed_success = (np.argmax(active_informed_results, axis=-1) == highest_cost_class).mean(axis=0)
+
+    fig, axes = plt.subplots(1,1)
     x_axis = np.arange(len(random_success)) * LOG_FREQ
-    plt.plot(x_axis, random_success, label='random')
-    plt.plot(x_axis, active_success, label='active')
-    plt.legend()
-    plt.savefig(args.output)
+    axes.plot(x_axis, random_success, label='random')
+    axes.plot(x_axis, active_success, label='active (uniform prior)')
+    axes.plot(x_axis, active_informed_success, label='active (informative prior)')
+    axes.legend()
+    plt.savefig(args.output / 'success_curve.png')
+
+    fig, axes = plt.subplots(1, 1)
+    n_samples=1000
+    posterior_samples = model.sample(n_samples)
+    max_expected_costs = posterior_samples.argmax(axis=1)
+    hist = np.zeros((dataset.num_classes,))
+    for i in range(dataset.num_classes):
+        hist[i] = (max_expected_costs == i).sum() / n_samples
+    axes.bar(np.arange(dataset.num_classes), hist)
+    fig.savefig(args.output / 'posterior_costs.png')
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('input', type=pathlib.Path, help='input dataset')
-    parser.add_argument('output', type=pathlib.Path, help='output image file')
+    parser.add_argument('output', type=pathlib.Path, help='output prefix')
     parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
                         help='path to a serialized numpy array containng the cost matrix')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
     parser.add_argument('-k', type=float, default=2, help='relative cost')
     parser.add_argument('--superclass', action='store_true')
+    parser.add_argument('--human', action='store_true')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)
