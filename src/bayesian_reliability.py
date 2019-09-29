@@ -82,7 +82,7 @@ def bayesian_reliability_diagram(confidence, Y_predict, Y_true, prior_type, fign
                                  pseudocount=None) -> None:
     output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
-    fig, ax1 = plt.subplots(figsize=(4.3, 4))
+    fig, ax1 = plt.subplots(figsize=(4.3, 3))
     color = 'tab:red'
     # ax1.grid(True)
     ax1.scatter([i + 0.5 for i in range(NUM_BINS)], output['accuracy_bins'], label="Frequentist", marker="^", s=100)
@@ -95,20 +95,20 @@ def bayesian_reliability_diagram(confidence, Y_predict, Y_true, prior_type, fign
     ax1.plot(np.linspace(0, 1, 11), linestyle="--", linewidth=3, c="gray")
     ax1.fill_between([i + 0.5 for i in range(NUM_BINS)], output['beta_posteriors_mean'], \
                      np.linspace(0, 1, 11)[:-1] + 0.05, color="gray", alpha=0.3)
-    ax1.legend(loc='upper left')
+    #ax1.legend(loc='upper left', prop={'size': 10})
     ax1.set_xlim((0.0, NUM_BINS))
-    ax1.set_xlabel("Score(Model Confidence)")
+    ax1.set_xlabel("Score(Model Confidence)", fontsize=14)
     ax1.set_xticks(range(NUM_BINS + 1))
     ax1.set_xticklabels(["%.1f" % i for i in np.linspace(0, 1, NUM_BINS + 1)])
     ax1.set_ylim((0.0, 1.0))
-    ax1.set_ylabel("Estimated Accuracy")
+    ax1.set_ylabel("Estimated Accuracy", fontsize=14)
 
     # add histogram to the reliability diagram
     ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    color = 'tab:green'
+    color = 'tab:blue'
     ax2.bar([i + 0.5 for i in range(NUM_BINS)], output['density_bins'], color=color, alpha=0.5, label="Histogram",
             width=1.0)
-    ax2.set_ylabel('Histogram', color=color)
+    ax2.set_ylabel('Histogram', color=color, fontsize=12)
     ax2.set_ylim((0.0, 2.0))
     ax2.set_yticks([0, 1.0])
     ax2.set_yticklabels([0, 1.0], color=color)
@@ -130,7 +130,7 @@ def compute_estimation_error(datafile, figname, N_list, num_runs, prior_type, VA
             output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
             bayesian_bias = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
-            frequentist_bias = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
+            frequentist_bias = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
             # empty bins
             bayesian_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             frequentist_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
@@ -142,15 +142,15 @@ def compute_estimation_error(datafile, figname, N_list, num_runs, prior_type, VA
                 bayesian_estimation_error[run_idx, i] = bayesian_bias.mean()
                 frequentist_estimation_error[run_idx, i] = frequentist_bias.mean()
 
-    fig, ax = plt.subplots(figsize=(4.3, 4))
-    ax.errorbar(N_list, bayesian_estimation_error.mean(axis=0), bayesian_estimation_error.std(axis=0), linestyle='None',
-                marker='^', label='Bayesian')
-    ax.errorbar(N_list, frequentist_estimation_error.mean(axis=0), frequentist_estimation_error.std(axis=0),
-                linestyle='None', marker='*', label='Frequentist')
-    plt.tight_layout()
-    plt.legend()
-    plt.savefig(figname)
-    plt.close()
+    # fig, ax = plt.subplots(figsize=(4.3, 4))
+    # ax.errorbar(N_list, bayesian_estimation_error.mean(axis=0), bayesian_estimation_error.std(axis=0), linestyle='None',
+    #             marker='^', label='Bayesian')
+    # ax.errorbar(N_list, frequentist_estimation_error.mean(axis=0), frequentist_estimation_error.std(axis=0),
+    #             linestyle='None', marker='*', label='Frequentist')
+    # plt.tight_layout()
+    # plt.legend()
+    # plt.savefig(figname)
+    # plt.close()
     return {"bayesian_estimation_error": bayesian_estimation_error,
             "frequentist_estimation_error": frequentist_estimation_error, }
 
@@ -158,26 +158,20 @@ def compute_estimation_error(datafile, figname, N_list, num_runs, prior_type, VA
 def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     VAR_list = [0.01, 0.05, 0.10, 0.25]  # takes value from (0, 0.25); variance of beta prior
     PSEUDOCOUNT = [0.1, 1, 10]
+    N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
 
     if DATASET == "cifar100":  # 10,000
-        N_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000,
-                  10000]
         datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
     elif DATASET == 'imagenet':  # 50,000
-        N_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000,
-                  10000, 20000, 30000, 40000, 50000]
         datafile = '../data/imagenet/resnet152_imagenet_outputs.txt'
     elif DATASET == 'imagenet2_topimages':  # 10,000
-        N_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000,
-                  10000]
         datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
     elif DATASET == '20newsgroup':  # 5607
-        N_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 2000, 3000, 4000, 5000, 5607]
-        datafile = "../data/20newsgroup/20newsgroups_in_domain.txt"
+        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
     elif DATASET == 'svhn':
-        N_list = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 200, 300, 400, 500, 1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000,
-                  10000, 20000, 26032]
         datafile = '../data/svhn/svhn_predictions.txt'
+    elif DATASET == 'dbpedia':
+        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
 
     if PRIORTYPE == 'fixed_var':
         for VAR in VAR_list:
@@ -191,6 +185,8 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
                                                          weighted=False)
             baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
             frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
+            baysian_estimation_error = np.vstack((np.array(N_list),baysian_estimation_error))
+            frequentist_estimation_error = np.vstack((np.array(N_list),frequentist_estimation_error))
             np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
             np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
 
@@ -205,6 +201,8 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
                                                          weighted=True)
             baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
             frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
+            baysian_estimation_error = np.vstack((np.array(N_list),baysian_estimation_error))
+            frequentist_estimation_error = np.vstack((np.array(N_list),frequentist_estimation_error))
             np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
             np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
 
@@ -219,6 +217,7 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
             estimation_error_output = compute_estimation_error(datafile, figname, N_list, NUM_RUNS, PRIORTYPE,
                                                          pseudocount=pseudo_n,
                                                          weighted=False)
+            print(estimation_error_output)
             baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
             frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
             np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
@@ -254,10 +253,13 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
         datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
     elif DATASET == '20newsgroup':  # 5607
         N_list = [100, 1000, 5607]
-        datafile = "../data/20newsgroup/20newsgroups_in_domain.txt"
+        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
     elif DATASET == 'svhn':  # 5607
         N_list = [100, 1000, 26032]
         datafile = '../data/svhn/svhn_predictions.txt'
+    elif DATASET == 'dbpedia':
+        N_list = [100, 1000, 70000]
+        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
 
     for N in N_list:
         confidence, Y_predict, Y_true = prepare_data(datafile, N)
@@ -278,8 +280,8 @@ if __name__ == "__main__":
     PRIORTYPE = 'pseudocount'  #
     NUM_RUNS = 10
 
-    #DATASET_LIST = ['cifar100', 'svhn', '20newsgroup', 'imagenet2_topimages', 'imagenet']
-    DATASET_LIST = ['svhn']
+    DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages'] #'svhn'
+    DATASET_LIST = ['imagenet2_topimages']
     for DATASET in DATASET_LIST:
-        run_reliability_diagrams(DATASET, PRIORTYPE)
-        #run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
+        #run_reliability_diagrams(DATASET, PRIORTYPE)
+        run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
