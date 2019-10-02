@@ -7,20 +7,20 @@ from scipy.stats import beta
 from scipy.stats import entropy
 
 
-def prepare_deques(categories, observations, num_classes):
-    """
-    INPUT:
-        categories: a list of length num_samples;
-        observations: a list of length num_samples; each element takes value from True or False
-    OUTPUT:
-        returns a list of num_classes queues; partitioning the data points in observations with predicted label in categories.
-    """
-    deques = [deque() for _ in range(num_classes)]
-    for category, observation in zip(categories, observations):
-        deques[category].append(observation)
-    for _deque in deques:
-        random.shuffle(_deque)
-    return deques
+# def prepare_deques(categories, observations, num_classes):
+#     """
+#     INPUT:
+#         categories: a list of length num_samples;
+#         observations: a list of length num_samples; each element takes value from True or False
+#     OUTPUT:
+#         returns a list of num_classes queues; partitioning the data points in observations with predicted label in categories.
+#     """
+#     deques = [deque() for _ in range(num_classes)]
+#     for category, observation in zip(categories, observations):
+#         deques[category].append(observation)
+#     for _deque in deques:
+#         random.shuffle(_deque)
+#     return deques
 
 
 ################### active overall accuracy estimation
