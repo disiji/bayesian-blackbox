@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from active_utils import prepare_data, thompson_sampling, top_two_thompson_sampling, random_sampling
-from utils import BetaBernoulli
+from models import BetaBernoulli
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -145,7 +145,7 @@ def main(RUNS, MODE, METRIC, DATASET, TTTS_BETA, MAX_TTTS_TRIAL):
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, FOUR_COLUMN)
     N = len(observations)
 
-    UNIFORM_PRIOR = np.ones((NUM_CLASSES, 2))/2
+    UNIFORM_PRIOR = np.ones((NUM_CLASSES, 2)) / 2
     confidence = _get_confidence_k(categories, confidences, NUM_CLASSES)
     INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T
 
@@ -231,18 +231,11 @@ if __name__ == "__main__":
 
     # configs
     RUNS = 100
-    DATASET = 'cifar100'  # 'cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia'
     MAX_TTTS_TRIAL = 50
     TTTS_BETA = 0.5
 
-    for DATASET in ['svhn', 'imagenet', '20newsgroup', 'dbpedia', 'cifar100']:
+    for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
         for METRIC in ['accuracy', 'calibration_bias']:
             for MODE in ['min', 'max']:
                 print(DATASET, METRIC, MODE, '...')
                 main(RUNS, MODE, METRIC, DATASET, TTTS_BETA, MAX_TTTS_TRIAL)
-
-    # DATASET = 'imagenet2_topimages'
-    # METRIC = 'accuracy'
-    # MODE = 'min'
-    # print(DATASET, METRIC, MODE, '...')
-    # main(RUNS, MODE, METRIC, DATASET, TTTS_BETA, MAX_TTTS_TRIAL)

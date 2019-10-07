@@ -1,17 +1,15 @@
 import argparse
-from collections import deque, defaultdict
 import logging
 import pathlib
+from collections import deque, defaultdict
 from typing import Callable, Deque, Dict, Iterable, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from sklearn.metrics import confusion_matrix
-from tqdm import tqdm
-
 from cifar100meta import superclass_lookup
 from models import DirichletMultinomialCost, Model
-
+from sklearn.metrics import confusion_matrix
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +154,7 @@ class SuperclassDataset:
                     continue
                 arr[class_idx, 1] += mean_scores[other_class_idx]
         # Law of total probability
-        arr[:,2] = 1 - arr[:,0] - arr[:,1]
+        arr[:, 2] = 1 - arr[:, 0] - arr[:, 1]
         return arr
 
     @property
@@ -301,7 +299,7 @@ def main(args: argparse.Namespace) -> None:
     active_success = (np.argmax(active_results, axis=-1) == highest_cost_class).mean(axis=0)
     active_informed_success = (np.argmax(active_informed_results, axis=-1) == highest_cost_class).mean(axis=0)
 
-    fig, axes = plt.subplots(1,1)
+    fig, axes = plt.subplots(1, 1)
     x_axis = np.arange(len(random_success)) * LOG_FREQ
     axes.plot(x_axis, random_success, label='random')
     axes.plot(x_axis, active_success, label='active (uniform prior)')
@@ -310,7 +308,7 @@ def main(args: argparse.Namespace) -> None:
     plt.savefig(args.output / 'success_curve.png')
 
     fig, axes = plt.subplots(1, 1)
-    n_samples=1000
+    n_samples = 1000
     posterior_samples = model.sample(n_samples)
     max_expected_costs = posterior_samples.argmax(axis=1)
     hist = np.zeros((dataset.num_classes,))

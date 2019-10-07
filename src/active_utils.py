@@ -2,7 +2,7 @@ import random
 from collections import deque
 from typing import List
 import numpy as np
-from utils import BetaBernoulli
+from models import BetaBernoulli
 
 # this function is different from bayesian_reliabiitly.prepare_data
 def prepare_data(filename, four_column=False):

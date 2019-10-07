@@ -56,6 +56,10 @@ class BetaBernoulli(Model):
         else:
             self._params = prior
 
+    @property
+    def theta(self):
+        return self._params[:, 0] / (self._params[:, 0] + self._params[:, 1])
+
     def update(self, category: int, observation: bool):
         """Updates the posterior of the Beta-Bernoulli model."""
         if observation:
