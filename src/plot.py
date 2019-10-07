@@ -13,7 +13,6 @@ FONT_SIZE = 8
 
 def plot_active_learning(pickle_filename):
     figname = ('../figures/active_learning/' + pickle_filename.split('/')[-1])[:-3] + 'pdf'
-    # figname = ('~/Dropbox/Apps/ShareLaTex/AAAI 2020 Bayesian Assessment of Blackbox Models/new_figures/active_learning/' + pickle_filename.split('/')[-1])[:-3] + 'pdf'
     success_rate_dict = pickle.load(open(pickle_filename, "rb"))
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
     for method_name in ['random', 'TTTS_uniform', 'TTTS_informed']:

@@ -142,15 +142,6 @@ def compute_estimation_error(datafile, figname, N_list, num_runs, prior_type, VA
                 bayesian_estimation_error[run_idx, i] = bayesian_bias.mean()
                 frequentist_estimation_error[run_idx, i] = frequentist_bias.mean()
 
-    # fig, ax = plt.subplots(figsize=(4.3, 4))
-    # ax.errorbar(N_list, bayesian_estimation_error.mean(axis=0), bayesian_estimation_error.std(axis=0), linestyle='None',
-    #             marker='^', label='Bayesian')
-    # ax.errorbar(N_list, frequentist_estimation_error.mean(axis=0), frequentist_estimation_error.std(axis=0),
-    #             linestyle='None', marker='*', label='Frequentist')
-    # plt.tight_layout()
-    # plt.legend()
-    # plt.savefig(figname)
-    # plt.close()
     return {"bayesian_estimation_error": bayesian_estimation_error,
             "frequentist_estimation_error": frequentist_estimation_error, }
 

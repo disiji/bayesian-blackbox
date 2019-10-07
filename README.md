@@ -1,4 +1,4 @@
 Bayesian Blackbox
 ===
 
-Experiments for the "TO BE NAMED" workshop paper.
+Experiments for the "Bayesian Evaluation of Black-Box Classifiers".
