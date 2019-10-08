@@ -267,12 +267,10 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
 
 if __name__ == "__main__":
     NUM_BINS = 10
-    DATASET = 'cifar100'  # cifar100, imagenet, imagenet2_topimages, 20newsgroup, svhn
     PRIORTYPE = 'pseudocount'  #
     NUM_RUNS = 10
 
-    DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages'] #'svhn'
-    DATASET_LIST = ['imagenet2_topimages']
+    DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
     for DATASET in DATASET_LIST:
         #run_reliability_diagrams(DATASET, PRIORTYPE)
         run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
