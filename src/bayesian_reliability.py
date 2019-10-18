@@ -1,9 +1,13 @@
 import csv
+import multiprocessing
 import os
 
 import matplotlib.pyplot as plt
 import numpy as np
+from joblib import Parallel, delayed
 from scipy import stats
+
+num_cores = multiprocessing.cpu_count()
 
 
 def BetaParams(mu, var):
@@ -152,17 +156,17 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             confidence, Y_predict, Y_true = prepare_data(datafile, N, random_seed=run_idx)
             output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
+            #### compute metrics
             bayesian_error = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
             frequentist_error = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
             bayesian_calibration_bias = np.abs(output['diagonal_bins'] - output['beta_posteriors_mean'])
             frequentist_calibration_bias = np.abs(output['diagonal_bins'] - output['empirical_accuracy'])
-
             # empty bins
             bayesian_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             frequentist_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
-
+            # compute metrics
             weighted_pool_bayesian_estimation_error[run_idx, i] = np.dot(bayesian_error, ground_truth['density_bins'])
             weighted_pool_frequentist_estimation_error[run_idx, i] = np.dot(frequentist_error,
                                                                             ground_truth['density_bins'])
@@ -207,9 +211,9 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     elif DATASET == '20newsgroup':  # 5607
         datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
         N_list = N_list[:-1]
-    elif DATASET == 'svhn': # 26032
+    elif DATASET == 'svhn':  # 26032
         datafile = '../data/svhn/svhn_predictions.txt'
-    elif DATASET == 'dbpedia': # 70000
+    elif DATASET == 'dbpedia':  # 70000
         datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
 
     if PRIORTYPE == 'fixed_var':
@@ -220,6 +224,8 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
             estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
                                                                pseudocount=pseudo_n)
 
+            # TODO: optimize this part of the code with for loop
+            # TODO: optimize this part by running frequentist method only once
             ## weighted estimation error, weight of each bin is estiamted by pooling all unlabeled data
             np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
                 DATASET, pseudo_n, NUM_RUNS),
@@ -252,7 +258,7 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
             np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
                        estimation_error_output['pool_bayesian_ece'],
                        delimiter=',')
-            np.savetxt(output_dir + "pool_ece%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+            np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
                        estimation_error_output['pool_frequentist_ece'],
                        delimiter=',')
 
@@ -261,7 +267,7 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
                        estimation_error_output['online_bayesian_ece'],
                        delimiter=',')
             np.savetxt(
-                output_dir + "online_ece%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                output_dir + "online_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
                 estimation_error_output['online_frequentist_ece'],
                 delimiter=',')
 
@@ -270,7 +276,7 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
                        estimation_error_output['bayesian_mce'],
                        delimiter=',')
             np.savetxt(
-                output_dir + "mce%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                output_dir + "mce_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
                 estimation_error_output['frequentist_mce'],
                 delimiter=',')
 
@@ -342,10 +348,12 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
 if __name__ == "__main__":
     NUM_BINS = 10
     PRIORTYPE = 'pseudocount'  #
-    NUM_RUNS = 100
+    NUM_RUNS = 10
 
     DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-    for DATASET in DATASET_LIST:
-        # run_reliability_diagrams(DATASET, PRIORTYPE)
-        run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
-        # run_true_calibration_error(DATASET)
+    # for DATASET in DATASET_LIST:
+    #     # run_reliability_diagrams(DATASET, PRIORTYPE)
+    #     run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
+    #     # run_true_calibration_error(DATASET)
+    results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
+                                         for DATASET in DATASET_LIST)
