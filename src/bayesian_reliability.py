@@ -207,9 +207,9 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     elif DATASET == '20newsgroup':  # 5607
         datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
         N_list = N_list[:-1]
-    elif DATASET == 'svhn':
+    elif DATASET == 'svhn': # 26032
         datafile = '../data/svhn/svhn_predictions.txt'
-    elif DATASET == 'dbpedia':
+    elif DATASET == 'dbpedia': # 70000
         datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
 
     if PRIORTYPE == 'fixed_var':
