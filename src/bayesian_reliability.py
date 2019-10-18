@@ -56,9 +56,8 @@ def get_ground_truth(filename):
 def bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR=None, pseudocount=None):
     bins = np.linspace(0, 1, NUM_BINS + 1)
     digitized = np.digitize(confidence, bins[1:-1])
-    accuracy_bins = [(Y_predict[digitized == i] == Y_true[digitized == i]).mean()
-                     for i in range(NUM_BINS)]
     density_bins = [(digitized == i).mean() for i in range(0, NUM_BINS)]
+    diagonal_bins = [(i + 0.5) / NUM_RUNS for i in range(0, NUM_BINS)]
 
     # compute prior, update prior
     if prior_type == 'fixed_var':
@@ -81,7 +80,7 @@ def bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR=None, pse
     beta_posterior_p975 = np.array([stats.beta.ppf(0.975, beta_posteriors[i, 0], beta_posteriors[i, 1])
                                     for i in range(NUM_BINS)])
     return {
-        'accuracy_bins': np.array(accuracy_bins),
+        'diagonal_bins': np.array(diagonal_bins),
         'density_bins': np.array(density_bins),
         'empirical_accuracy': empirical_accuracy,
         'beta_posteriors_mean': beta_posteriors_mean,
@@ -97,7 +96,8 @@ def bayesian_reliability_diagram(confidence, Y_predict, Y_true, prior_type, fign
     fig, ax1 = plt.subplots(figsize=(4.3, 3))
     color = 'tab:red'
     # ax1.grid(True)
-    ax1.scatter([i + 0.5 for i in range(NUM_BINS)], output['accuracy_bins'], label="Frequentist", marker="^", s=100)
+    ax1.scatter([i + 0.5 for i in range(NUM_BINS)], output['empirical_accuracy'], label="Frequentist", marker="^",
+                s=100)
     ax1.plot([i + 0.5 for i in range(NUM_BINS)], output['beta_posteriors_mean'], c="r", linestyle="--")
     ax1.errorbar([i + 0.5 for i in range(NUM_BINS)],
                  output['beta_posteriors_mean'],
@@ -129,39 +129,74 @@ def bayesian_reliability_diagram(confidence, Y_predict, Y_true, prior_type, fign
     plt.savefig(figname)
 
 
-def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, pseudocount=None,
-                             weighted=False):
+def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, pseudocount=None):
     ground_truth = get_ground_truth(datafile)
-    bayesian_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
-    frequentist_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+
     print(datafile, prior_type, VAR, pseudocount, "...")
+
+    weighted_pool_bayesian_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    weighted_pool_frequentist_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    weighted_online_bayesian_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    weighted_online_frequentist_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    unweighted_bayesian_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    unweighted_frequentist_estimation_error = np.zeros(shape=(num_runs, len(N_list)))
+    pool_bayesian_ece = np.zeros(shape=(num_runs, len(N_list)))
+    pool_frequentist_ece = np.zeros(shape=(num_runs, len(N_list)))
+    online_bayesian_ece = np.zeros(shape=(num_runs, len(N_list)))
+    online_frequentist_ece = np.zeros(shape=(num_runs, len(N_list)))
+    bayesian_mce = np.zeros(shape=(num_runs, len(N_list)))
+    frequentist_mce = np.zeros(shape=(num_runs, len(N_list)))
 
     for run_idx in range(num_runs):
         for i, N in enumerate(N_list):
             confidence, Y_predict, Y_true = prepare_data(datafile, N, random_seed=run_idx)
             output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
-            bayesian_bias = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
-            frequentist_bias = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
+            bayesian_error = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
+            frequentist_error = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
+            bayesian_calibration_bias = np.abs(output['diagonal_bins'] - output['beta_posteriors_mean'])
+            frequentist_calibration_bias = np.abs(output['diagonal_bins'] - output['empirical_accuracy'])
+
             # empty bins
-            bayesian_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
-            frequentist_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
+            bayesian_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
+            frequentist_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
+            bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
+            bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
 
-            if weighted:
-                bayesian_estimation_error[run_idx, i] = np.dot(bayesian_bias, ground_truth['density_bins'])
-                frequentist_estimation_error[run_idx, i] = np.dot(frequentist_bias, ground_truth['density_bins'])
-            else:
-                bayesian_estimation_error[run_idx, i] = bayesian_bias.mean()
-                frequentist_estimation_error[run_idx, i] = frequentist_bias.mean()
+            weighted_pool_bayesian_estimation_error[run_idx, i] = np.dot(bayesian_error, ground_truth['density_bins'])
+            weighted_pool_frequentist_estimation_error[run_idx, i] = np.dot(frequentist_error,
+                                                                            ground_truth['density_bins'])
+            weighted_online_bayesian_estimation_error[run_idx, i] = np.dot(bayesian_error, output['density_bins'])
+            weighted_online_frequentist_estimation_error[run_idx, i] = np.dot(frequentist_error, output['density_bins'])
+            unweighted_bayesian_estimation_error[run_idx, i] = bayesian_error.mean()
+            unweighted_frequentist_estimation_error[run_idx, i] = frequentist_error.mean()
+            pool_bayesian_ece[run_idx, i] = np.dot(bayesian_calibration_bias, ground_truth['density_bins'])
+            pool_frequentist_ece[run_idx, i] = np.dot(frequentist_calibration_bias, ground_truth['density_bins'])
+            online_bayesian_ece[run_idx, i] = np.dot(bayesian_calibration_bias, output['density_bins'])
+            online_frequentist_ece[run_idx, i] = np.dot(frequentist_calibration_bias, output['density_bins'])
+            bayesian_mce[run_idx, i] = bayesian_calibration_bias.max()
+            frequentist_mce[run_idx, i] = frequentist_calibration_bias.max()
 
-    return {"bayesian_estimation_error": bayesian_estimation_error,
-            "frequentist_estimation_error": frequentist_estimation_error, }
+    return {
+        "weighted_pool_bayesian_estimation_error": weighted_pool_bayesian_estimation_error,
+        "weighted_pool_frequentist_estimation_error": weighted_pool_frequentist_estimation_error,
+        "weighted_online_bayesian_estimation_error": weighted_online_bayesian_estimation_error,
+        "weighted_online_frequentist_estimation_error": weighted_online_frequentist_estimation_error,
+        "unweighted_bayesian_estimation_error": unweighted_bayesian_estimation_error,
+        "unweighted_frequentist_estimation_error": unweighted_frequentist_estimation_error,
+        "pool_bayesian_ece": pool_bayesian_ece,
+        "pool_frequentist_ece": pool_frequentist_ece,
+        "online_bayesian_ece": online_bayesian_ece,
+        "online_frequentist_ece": online_frequentist_ece,
+        "bayesian_mce": bayesian_mce,
+        "frequentist_mce": frequentist_mce}
 
 
 def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     VAR_list = [0.01, 0.05, 0.10, 0.25]  # takes value from (0, 0.25); variance of beta prior
     PSEUDOCOUNT = [0.1, 1, 10]
-    N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000]
+    N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    output_dir = "../output/accuracy_estimation_error/"
 
     if DATASET == "cifar100":  # 10,000
         datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
@@ -171,64 +206,73 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
         datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
     elif DATASET == '20newsgroup':  # 5607
         datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
+        N_list = N_list[:-1]
     elif DATASET == 'svhn':
         datafile = '../data/svhn/svhn_predictions.txt'
     elif DATASET == 'dbpedia':
         datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
 
     if PRIORTYPE == 'fixed_var':
-        for VAR in VAR_list:
-            bayesian_output_name = "../output/accuracy_estimation_error/unweighted_error_%s_VAR%.2f_runs%d_bayesian.csv" % (
-                DATASET, VAR, NUM_RUNS)
-            frequentist_output_name = "../output/accuracy_estimation_error/unweighted_error_%s_VAR%.2f_runs%d_frequentist.csv" % (
-                DATASET, VAR, NUM_RUNS)
-            estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE, VAR=VAR,
-                                                               weighted=False)
-            baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
-            frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
-            baysian_estimation_error = np.vstack((np.array(N_list), baysian_estimation_error))
-            frequentist_estimation_error = np.vstack((np.array(N_list), frequentist_estimation_error))
-            np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
-            np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
-
-            bayesian_output_name = "../output/accuracy_estimation_error/weighted_error_%s_VAR%.2f_runs%d_bayesian.csv" % (
-                DATASET, VAR, NUM_RUNS)
-            frequentist_output_name = "../output/accuracy_estimation_error/weighted_error_%s_VAR%.2f_runs%d_frequentist.csv" % (
-                DATASET, VAR, NUM_RUNS)
-            estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE, VAR=VAR,
-                                                               weighted=True)
-            baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
-            frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
-            baysian_estimation_error = np.vstack((np.array(N_list), baysian_estimation_error))
-            frequentist_estimation_error = np.vstack((np.array(N_list), frequentist_estimation_error))
-            np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
-            np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
+        pass
 
     elif PRIORTYPE == 'pseudocount':
         for pseudo_n in PSEUDOCOUNT:
-            bayesian_output_name = "../output/accuracy_estimation_error/unweighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
-                DATASET, pseudo_n, NUM_RUNS)
-            frequentist_output_name = "../output/accuracy_estimation_error/unweighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
-                DATASET, pseudo_n, NUM_RUNS)
             estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
-                                                               pseudocount=pseudo_n,
-                                                               weighted=False)
-            baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
-            frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
-            np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
-            np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
+                                                               pseudocount=pseudo_n)
 
-            bayesian_output_name = "../output/accuracy_estimation_error/weighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
-                DATASET, pseudo_n, NUM_RUNS)
-            frequentist_output_name = "../output/accuracy_estimation_error/weighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
-                DATASET, pseudo_n, NUM_RUNS)
-            estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
-                                                               pseudocount=pseudo_n,
-                                                               weighted=True)
-            baysian_estimation_error = estimation_error_output['bayesian_estimation_error']
-            frequentist_estimation_error = estimation_error_output['frequentist_estimation_error']
-            np.savetxt(bayesian_output_name, baysian_estimation_error, delimiter=',')
-            np.savetxt(frequentist_output_name, frequentist_estimation_error, delimiter=',')
+            ## weighted estimation error, weight of each bin is estiamted by pooling all unlabeled data
+            np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['weighted_pool_bayesian_estimation_error'],
+                       delimiter=',')
+            np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['weighted_pool_frequentist_estimation_error'], delimiter=',')
+
+            ## weighted estimation error, weight of each bin is estiamted with observed labeled data
+            np.savetxt(output_dir + "weighted_online_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['weighted_online_bayesian_estimation_error'],
+                       delimiter=',')
+            np.savetxt(output_dir + "weighted_online_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['weighted_online_frequentist_estimation_error'], delimiter=',')
+
+            ## unweighted estimation error
+            np.savetxt(output_dir + "unweighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['unweighted_bayesian_estimation_error'],
+                       delimiter=',')
+            np.savetxt(output_dir + "unweighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
+                DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['unweighted_frequentist_estimation_error'],
+                       delimiter=',')
+
+            ## ece, weight of each bin is estiamted by pooling all unlabeled data
+            np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['pool_bayesian_ece'],
+                       delimiter=',')
+            np.savetxt(output_dir + "pool_ece%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['pool_frequentist_ece'],
+                       delimiter=',')
+
+            ## ece, weight of each bin is estiamted with observed labeled data
+            np.savetxt(output_dir + "online_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['online_bayesian_ece'],
+                       delimiter=',')
+            np.savetxt(
+                output_dir + "online_ece%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                estimation_error_output['online_frequentist_ece'],
+                delimiter=',')
+
+            ## mce
+            np.savetxt(output_dir + "mce_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                       estimation_error_output['bayesian_mce'],
+                       delimiter=',')
+            np.savetxt(
+                output_dir + "mce%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                estimation_error_output['frequentist_mce'],
+                delimiter=',')
 
 
 def run_true_calibration_error(DATASET):
@@ -275,7 +319,7 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
     elif DATASET == '20newsgroup':  # 5607
         N_list = [100, 1000, 5607]
         datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
-    elif DATASET == 'svhn':  # 5607
+    elif DATASET == 'svhn':
         N_list = [100, 1000, 26032]
         datafile = '../data/svhn/svhn_predictions.txt'
     elif DATASET == 'dbpedia':
@@ -298,10 +342,10 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
 if __name__ == "__main__":
     NUM_BINS = 10
     PRIORTYPE = 'pseudocount'  #
-    NUM_RUNS = 10
+    NUM_RUNS = 100
 
     DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
     for DATASET in DATASET_LIST:
         # run_reliability_diagrams(DATASET, PRIORTYPE)
-        # run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
-        run_true_calibration_error(DATASET)
+        run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
+        # run_true_calibration_error(DATASET)
