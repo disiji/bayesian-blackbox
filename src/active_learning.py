@@ -235,20 +235,17 @@ def main(RUNS, MODE, METRIC, DATASET):
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
-
-    print(success_rate_dict)
-    output_name = "../test/active_learning/%s_%s_%s_runs_%d.pkl" % (DATASET, METRIC, MODE, RUNS)
-    pickle.dump(success_rate_dict, open(output_name, "wb"))
+        output_name = "../output/active_learning/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, METRIC, MODE, method, RUNS)
+        pickle.dump(success_rate_dict[method], open(output_name, "wb"))
 
     # evaluation
-    figname = "../test/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, METRIC, MODE, RUNS)
+    figname = "../output/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, METRIC, MODE, RUNS)
     comparison_plot(success_rate_dict, figname)
 
 
 if __name__ == "__main__":
 
-    # configs
-    RUNS = 10
+    RUNS = 100
 
     for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
         for METRIC in ['accuracy', 'calibration_bias']:
