@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from active_utils import prepare_data, SAMPLE_CATEGORY
 from models import BetaBernoulli
+import copy
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -61,24 +62,33 @@ def _get_ground_truth(categories: List[int], observations: List[bool], confidenc
         return np.argwhere(metric_val == np.amin(metric_val)).flatten().tolist()
 
 
-def get_samples(categories: List[int], observations: List[bool], confidences: List[float],
-                num_classes: int, n: int, sample_method: str, mode: str, metric: str, prior=None,
-                random_seed=0) -> Tuple[np.ndarray, np.ndarray]:
+def get_samples(categories: List[int],
+                observations: List[bool],
+                confidences: List[float],
+                num_classes: int,
+                num_samples: int,
+                sample_method: str,
+                mode: str,
+                metric: str,
+                prior=None,
+                random_seed: int =0) -> Tuple[np.ndarray, np.ndarray]:
     # prepare model, deques, thetas, choices
     random.seed(random_seed)
-    model = BetaBernoulli(num_classes, prior)
+
+    model = copy.deepcopy(BetaBernoulli(num_classes, prior))
     deques = [deque() for _ in range(num_classes)]
     for category, observation in zip(categories, observations):
         deques[category].append(observation)
     for _deque in deques:
         random.shuffle(_deque)
-    success = np.zeros((n,))
 
     ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode)
     confidence_k = _get_confidence_k(categories, confidences, num_classes)
 
-    for i in range(n):
+    success = copy.deepcopy(np.zeros((num_samples,)))
+    for i in range(num_samples):
         category = SAMPLE_CATEGORY[sample_method].__call__(deques=deques,
+                                                           random_seed=random_seed,
                                                            model=model,
                                                            mode=mode,
                                                            metric=metric,
@@ -86,8 +96,7 @@ def get_samples(categories: List[int], observations: List[bool], confidences: Li
                                                            max_ttts_trial=50,
                                                            ttts_beta=0.5,
                                                            epsilon=0.1,
-                                                           ucb_c=1)
-
+                                                           ucb_c=1,)
         # update model, deques, thetas, choices
         model.update(category, deques[category].pop())
 
@@ -99,7 +108,6 @@ def get_samples(categories: List[int], observations: List[bool], confidences: Li
             success[i] = (np.argmin(metric_val) in ground_truth) * 1.0
         elif mode == 'max':
             success[i] = (np.argmax(metric_val) in ground_truth) * 1.0
-
     return success
 
 
@@ -154,24 +162,27 @@ def main(RUNS, MODE, METRIC, DATASET):
     # get samples for multiple runs
     # returns one thing: success or not
     success_rate_dict = {
-        'random': np.zeros((N,)),
-        'ts_uniform': np.zeros((N,)),
-        'ttts_uniform': np.zeros((N,)),
-        'ts_informed': np.zeros((N,)),
-        'ttts_informed': np.zeros((N,)),
-        'epsilon_greedy': np.zeros((N,)),
-        'bayesian_ucb': np.zeros((N,))
+        'random': copy.deepcopy(np.zeros((N,))),
+        'ts_uniform': copy.deepcopy(np.zeros((N,))),
+        'ttts_uniform': copy.deepcopy(np.zeros((N,))),
+        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'ttts_informed': copy.deepcopy(np.zeros((N,))),
+        'epsilon_greedy': copy.deepcopy(np.zeros((N,))),
+        'bayesian_ucb': copy.deepcopy(np.zeros((N,))),
     }
     for r in range(RUNS):
+        print(r, 'random')
         success_rate_dict['random'] += get_samples(categories,
                                                    observations,
                                                    confidences,
-                                                   NUM_CLASSES, N,
+                                                   NUM_CLASSES,
+                                                   N,
                                                    sample_method='random',
                                                    mode=MODE,
                                                    metric=METRIC,
                                                    prior=UNIFORM_PRIOR,
                                                    random_seed=r)
+        print(r, 'ts_uniform')
         success_rate_dict['ts_uniform'] += get_samples(categories,
                                                        observations,
                                                        confidences,
@@ -182,6 +193,7 @@ def main(RUNS, MODE, METRIC, DATASET):
                                                        metric=METRIC,
                                                        prior=UNIFORM_PRIOR,
                                                        random_seed=r)
+        print(r, 'ttts_uniform')
         success_rate_dict['ttts_uniform'] += get_samples(categories,
                                                          observations,
                                                          confidences,
@@ -192,6 +204,7 @@ def main(RUNS, MODE, METRIC, DATASET):
                                                          metric=METRIC,
                                                          prior=UNIFORM_PRIOR,
                                                          random_seed=r)
+        print(r, 'ts_informed')
         success_rate_dict['ts_informed'] += get_samples(categories,
                                                         observations,
                                                         confidences,
@@ -202,6 +215,7 @@ def main(RUNS, MODE, METRIC, DATASET):
                                                         metric=METRIC,
                                                         prior=INFORMED_PRIOR,
                                                         random_seed=r)
+        print(r, 'ttts_informed')
         success_rate_dict['ttts_informed'] += get_samples(categories,
                                                           observations,
                                                           confidences,
@@ -212,6 +226,7 @@ def main(RUNS, MODE, METRIC, DATASET):
                                                           metric=METRIC,
                                                           prior=INFORMED_PRIOR,
                                                           random_seed=r)
+        print(r, 'epsilon_greedy')
         success_rate_dict['epsilon_greedy'] += get_samples(categories,
                                                            observations,
                                                            confidences,
@@ -222,6 +237,7 @@ def main(RUNS, MODE, METRIC, DATASET):
                                                            metric=METRIC,
                                                            prior=UNIFORM_PRIOR,
                                                            random_seed=r)
+        print(r, 'bayesian_ucb')
         success_rate_dict['bayesian_ucb'] += get_samples(categories,
                                                          observations,
                                                          confidences,
@@ -247,7 +263,8 @@ if __name__ == "__main__":
 
     RUNS = 100
 
-    for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
+    # for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
+    for DATASET in ['cifar100']:
         for METRIC in ['accuracy', 'calibration_bias']:
             for MODE in ['min', 'max']:
                 print(DATASET, METRIC, MODE, '...')

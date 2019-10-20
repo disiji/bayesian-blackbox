@@ -78,9 +78,6 @@ class BetaBernoulli(Model):
     def get_variance(self):
         return beta.var(self._params[:, 0], self._params[:, 1])
 
-    def get_expectation(self):
-        return beta.mean(self._params[:, 0], self._params[:, 1])
-
     def get_overall_acc(self, weight):
         return np.dot(beta.mean(self._params[:, 0], self._params[:, 1]), weight)
 

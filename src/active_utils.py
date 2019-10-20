@@ -116,7 +116,7 @@ def epsilon_greedy(deques: List[deque],
     if random.random() < epsilon:
         return random_sampling(deques)
     else:
-        theta_hat = model.get_expectation()
+        theta_hat = model.theta
         if metric == 'accuracy':
             metric_val = theta_hat
         elif metric == 'calibration_bias':
@@ -140,9 +140,9 @@ def bayesian_UCB(deques: List[deque],
                  **kwargs) -> int:
     # get mean of metric_val
     if metric == 'accuracy':
-        metric_val = model.get_expectation()
+        metric_val = model.theta
     elif metric == 'calibration_bias':
-        metric_val = confidence_k - model.get_expectation()
+        metric_val = confidence_k - model.theta
     if mode == 'max':
         metric_val += ucb_c * model.get_variance()
         ranked = np.argsort(metric_val)[::-1]
