@@ -4,7 +4,6 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from joblib import Parallel, delayed
 from scipy import stats
 
 num_cores = multiprocessing.cpu_count()
@@ -157,6 +156,10 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
             #### compute metrics
+            print("=======================#samples: %d=====================" % N)
+            print("output['diagonal_bins']:", output['diagonal_bins'] )
+            print("output['empirical_accuracy']:", output['empirical_accuracy'])
+            print("output['beta_posteriors_mean']", output['beta_posteriors_mean'])
             bayesian_error = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
             frequentist_error = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
             bayesian_calibration_bias = np.abs(output['diagonal_bins'] - output['beta_posteriors_mean'])
@@ -165,7 +168,7 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             bayesian_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             frequentist_error[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
-            bayesian_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
+            frequentist_calibration_bias[np.isnan(ground_truth['accuracy_bins'])] = 0.0
             # compute metrics
             weighted_pool_bayesian_estimation_error[run_idx, i] = np.dot(bayesian_error, ground_truth['density_bins'])
             weighted_pool_frequentist_estimation_error[run_idx, i] = np.dot(frequentist_error,
@@ -197,9 +200,9 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
 
 
 def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
-    VAR_list = [0.01, 0.05, 0.10, 0.25]  # takes value from (0, 0.25); variance of beta prior
     PSEUDOCOUNT = [0.1, 1, 10]
-    N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    # N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    N_list = [100, 200, 2000, 10000]
     output_dir = "../output/accuracy_estimation_error/"
 
     if DATASET == "cifar100":  # 10,000
@@ -223,6 +226,7 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
         for pseudo_n in PSEUDOCOUNT:
             estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
                                                                pseudocount=pseudo_n)
+            print(estimation_error_output)
 
             ## weighted estimation error, weight of each bin is estiamted by pooling all unlabeled data
             np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
@@ -347,12 +351,13 @@ def run_reliability_diagrams(DATASET, PRIORTYPE):
 if __name__ == "__main__":
     NUM_BINS = 10
     PRIORTYPE = 'pseudocount'  #
-    NUM_RUNS = 10
+    NUM_RUNS = 100
 
     DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-    # for DATASET in DATASET_LIST:
-    #     # run_reliability_diagrams(DATASET, PRIORTYPE)
-    #     run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
-    #     # run_true_calibration_error(DATASET)
-    results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
-                                         for DATASET in DATASET_LIST)
+    DATASET_LIST = ['cifar100']
+    for DATASET in DATASET_LIST:
+        # run_reliability_diagrams(DATASET, PRIORTYPE)
+        run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
+        # run_true_calibration_error(DATASET)
+    # results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
+    #                                      for DATASET in DATASET_LIST)
