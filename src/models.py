@@ -4,6 +4,7 @@ Bayesian blackbox assesment models.
 import numpy as np
 from scipy.stats import beta
 
+
 class GenerativeModel:
     def __init__(self, theta: np.ndarray):
         self._num_categories = theta.shape[0]
@@ -24,6 +25,7 @@ class Model:
 
     Derived classes must implement an update and sample method.
     """
+
     def update(self, predicted_class: int, true_class: int) -> None:
         """
         Update the model given a new observation.
@@ -47,6 +49,7 @@ class Model:
             The sampled parameter vector.
         """
         raise NotImplementedError
+
 
 class BetaBernoulli(Model):
     def __init__(self, k: int, prior=None):
@@ -95,6 +98,7 @@ class DirichletMultinomialCost(Model):
     costs : np.ndarray
         An array of shape (n_classes, n_classes). The cost matrix.
     """
+
     def __init__(self, alphas: np.ndarray, costs: np.ndarray) -> None:
         assert alphas.shape == costs.shape
         self._alphas = np.copy(alphas)

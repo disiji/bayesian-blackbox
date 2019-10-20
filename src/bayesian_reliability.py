@@ -224,8 +224,6 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
             estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
                                                                pseudocount=pseudo_n)
 
-            # TODO: optimize this part of the code with for loop
-            # TODO: optimize this part by running frequentist method only once
             ## weighted estimation error, weight of each bin is estiamted by pooling all unlabeled data
             np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
                 DATASET, pseudo_n, NUM_RUNS),
@@ -258,9 +256,10 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
             np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
                        estimation_error_output['pool_bayesian_ece'],
                        delimiter=',')
-            np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['pool_frequentist_ece'],
-                       delimiter=',')
+            np.savetxt(
+                output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
+                estimation_error_output['pool_frequentist_ece'],
+                delimiter=',')
 
             ## ece, weight of each bin is estiamted with observed labeled data
             np.savetxt(output_dir + "online_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),

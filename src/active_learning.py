@@ -1,3 +1,4 @@
+import copy
 import pickle
 import random
 from collections import deque
@@ -8,7 +9,6 @@ import numpy as np
 import pandas as pd
 from active_utils import prepare_data, SAMPLE_CATEGORY
 from models import BetaBernoulli
-import copy
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches

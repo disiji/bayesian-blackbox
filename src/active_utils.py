@@ -162,5 +162,3 @@ SAMPLE_CATEGORY = {
     'epsilon_greedy': epsilon_greedy,
     'bayesian_ucb': bayesian_UCB
 }
-
-
