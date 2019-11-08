@@ -1,6 +1,7 @@
 import csv
 import multiprocessing
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -60,7 +61,7 @@ def bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR=None, pse
     bins = np.linspace(0, 1, NUM_BINS + 1)
     digitized = np.digitize(confidence, bins[1:-1])
     density_bins = [(digitized == i).mean() for i in range(0, NUM_BINS)]
-    diagonal_bins = [(i + 0.5) / NUM_RUNS for i in range(0, NUM_BINS)]
+    diagonal_bins = [(i + 0.5) / NUM_BINS for i in range(0, NUM_BINS)]
 
     # compute prior, update prior
     if prior_type == 'fixed_var':
@@ -156,10 +157,6 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             output = bayesian_assessment(confidence, Y_predict, Y_true, prior_type, VAR, pseudocount)
 
             #### compute metrics
-            print("=======================#samples: %d=====================" % N)
-            print("output['diagonal_bins']:", output['diagonal_bins'] )
-            print("output['empirical_accuracy']:", output['empirical_accuracy'])
-            print("output['beta_posteriors_mean']", output['beta_posteriors_mean'])
             bayesian_error = np.abs(ground_truth['accuracy_bins'] - output['beta_posteriors_mean'])
             frequentist_error = np.abs(ground_truth['accuracy_bins'] - output['empirical_accuracy'])
             bayesian_calibration_bias = np.abs(output['diagonal_bins'] - output['beta_posteriors_mean'])
@@ -184,6 +181,15 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             bayesian_mce[run_idx, i] = bayesian_calibration_bias.max()
             frequentist_mce[run_idx, i] = frequentist_calibration_bias.max()
 
+            # print("=================", N)
+            # print("ground_truth['accuracy_bins']:", ground_truth['accuracy_bins'])
+            # print("ground_truth['density_bins']:", ground_truth['density_bins'])
+            # print("output['density_bins']:", output['density_bins'])
+            # print("output['beta_posteriors_mean']:", output['beta_posteriors_mean'])
+            # print("output['diagonal_bins']:", output['diagonal_bins'])
+            # print("bayesian_calibration_bias:", bayesian_calibration_bias)
+            # print("frequentist_calibration_bias:", frequentist_calibration_bias)
+
     return {
         "weighted_pool_bayesian_estimation_error": weighted_pool_bayesian_estimation_error,
         "weighted_pool_frequentist_estimation_error": weighted_pool_frequentist_estimation_error,
@@ -201,8 +207,8 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
 
 def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     PSEUDOCOUNT = [0.1, 1, 10]
-    # N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
-    N_list = [100, 200, 2000, 10000]
+    N_list = [10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+    # N_list = [100, 200, 2000, 10000]
     output_dir = "../output/accuracy_estimation_error/"
 
     if DATASET == "cifar100":  # 10,000
@@ -354,10 +360,17 @@ if __name__ == "__main__":
     NUM_RUNS = 100
 
     DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-    DATASET_LIST = ['cifar100']
-    for DATASET in DATASET_LIST:
-        # run_reliability_diagrams(DATASET, PRIORTYPE)
-        run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
-        # run_true_calibration_error(DATASET)
+    # DATASET_LIST = ['cifar100']
+
+    dataset = str(sys.argv[1])
+    if dataset not in DATASET_LIST:
+        raise ValueError("%s is not in DATASET_LIST." % dataset)
+
+    run_calibration_error(dataset, PRIORTYPE, NUM_RUNS)
+
+    # for DATASET in DATASET_LIST:
+    # run_reliability_diagrams(DATASET, PRIORTYPE)
+    # run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
+    # run_true_calibration_error(DATASET)
     # results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
     #                                      for DATASET in DATASET_LIST)
