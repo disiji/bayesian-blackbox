@@ -359,12 +359,12 @@ if __name__ == "__main__":
     PRIORTYPE = 'pseudocount'  #
     NUM_RUNS = 100
 
-    DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-    # DATASET_LIST = ['cifar100']
+    # DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
+    DATASET_LIST = ['cifar100']
 
     dataset = str(sys.argv[1])
     if dataset not in DATASET_LIST:
-        raise ValueError("%s is not in DATASET_LIST." % dataset)
+        raise ValueError("%s is not in DATASET_LIST." % dataset) 
 
     run_calibration_error(dataset, PRIORTYPE, NUM_RUNS)
 

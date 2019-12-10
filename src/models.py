@@ -1,6 +1,8 @@
 """
 Bayesian blackbox assesment models.
 """
+import math
+
 import numpy as np
 from scipy.stats import beta
 
@@ -182,7 +184,7 @@ class SpikeAndBetaSlab(Model):
             self._beta = np.copy(prior_beta)
 
     def update(self, category: int, observation: bool):
-        """Updates the posterior of the SpikeAndBetaSlab-Bernoulli model with one observation."""
+        """Updates the posterior: of the SpikeAndBetaSlab-Bernoulli model with one observation."""
         if observation:
             self._mu[category] = (self._mu[category] * self._theta_0[category]) / (
                     self._mu[category] * self._theta_0[category] + 1 - self._mu[category])
@@ -192,8 +194,7 @@ class SpikeAndBetaSlab(Model):
                     self._mu[category] * (1 - self._theta_0[category]) + 1 - self._mu[category])
             self._beta[category] += 1
 
-    import math
-    def _binom(n, k):
+    def _binom(n: int, k: int):
         return math.factorial(n) // math.factorial(k) // math.factorial(n - k)
 
     def update_batch(self, category: int, n: int, k: int):
