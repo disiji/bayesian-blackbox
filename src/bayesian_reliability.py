@@ -9,6 +9,39 @@ from scipy import stats
 
 num_cores = multiprocessing.cpu_count()
 
+datafile_dict = {
+    'cifar100': '../data/cifar100/cifar100_predictions_dropout.txt',
+    'imagenet': '../data/imagenet/resnet152_imagenet_outputs.txt',
+    'imagenet2_topimages': '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt',
+    '20newsgroup': '../data/20newsgroup/bert_20_newsgroups_outputs.txt',
+    'svhn': '../data/svhn/svhn_predictions.txt',
+    'dbpedia': '../data/dbpedia/bert_dbpedia_outputs.txt',
+}
+
+datasize_dict = {
+    'cifar100': 10000,
+    'imagenet': 50000,
+    'imagenet2_topimages': 10000,
+    '20newsgroup': 5607,
+    'svhn': 26032,
+    'dbpedia': 70000,
+}
+
+output_str_dict = {
+    'weighted_pool_bayesian_estimation_error': 'weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'weighted_pool_frequentist_estimation_error': 'weighted_pool_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
+    'weighted_online_bayesian_estimation_error': 'weighted_online_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'weighted_online_frequentist_estimation_error': 'weighted_online_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
+    'unweighted_bayesian_estimation_error': 'unweighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'unweighted_frequentist_estimation_error': 'unweighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
+    'pool_bayesian_ece': 'pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'pool_frequentist_ece': 'pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv',
+    'online_bayesian_ece': 'online_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'online_frequentist_ece': 'online_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv',
+    'bayesian_mce': 'mce_%s_PseudoCount%.1f_runs%d_bayesian.csv',
+    'frequentist_mce': 'mce_%s_PseudoCount%.1f_runs%d_frequentist.csv'
+}
+
 
 def BetaParams(mu, var):
     """
@@ -181,15 +214,6 @@ def compute_estimation_error(datafile, N_list, num_runs, prior_type, VAR=None, p
             bayesian_mce[run_idx, i] = bayesian_calibration_bias.max()
             frequentist_mce[run_idx, i] = frequentist_calibration_bias.max()
 
-            # print("=================", N)
-            # print("ground_truth['accuracy_bins']:", ground_truth['accuracy_bins'])
-            # print("ground_truth['density_bins']:", ground_truth['density_bins'])
-            # print("output['density_bins']:", output['density_bins'])
-            # print("output['beta_posteriors_mean']:", output['beta_posteriors_mean'])
-            # print("output['diagonal_bins']:", output['diagonal_bins'])
-            # print("bayesian_calibration_bias:", bayesian_calibration_bias)
-            # print("frequentist_calibration_bias:", frequentist_calibration_bias)
-
     return {
         "weighted_pool_bayesian_estimation_error": weighted_pool_bayesian_estimation_error,
         "weighted_pool_frequentist_estimation_error": weighted_pool_frequentist_estimation_error,
@@ -211,100 +235,27 @@ def run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS):
     # N_list = [100, 200, 2000, 10000]
     output_dir = "../output/accuracy_estimation_error/"
 
-    if DATASET == "cifar100":  # 10,000
-        datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
-    elif DATASET == 'imagenet':  # 50,000
-        datafile = '../data/imagenet/resnet152_imagenet_outputs.txt'
-    elif DATASET == 'imagenet2_topimages':  # 10,000
-        datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
-    elif DATASET == '20newsgroup':  # 5607
-        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
+    if DATASET == '20newsgroup':  # 5607
         N_list = N_list[:-1]
-    elif DATASET == 'svhn':  # 26032
-        datafile = '../data/svhn/svhn_predictions.txt'
-    elif DATASET == 'dbpedia':  # 70000
-        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
+    datafile = datafile_dict[DATASET]
 
     if PRIORTYPE == 'fixed_var':
         pass
-
     elif PRIORTYPE == 'pseudocount':
         for pseudo_n in PSEUDOCOUNT:
             estimation_error_output = compute_estimation_error(datafile, N_list, NUM_RUNS, PRIORTYPE,
                                                                pseudocount=pseudo_n)
             print(estimation_error_output)
 
-            ## weighted estimation error, weight of each bin is estiamted by pooling all unlabeled data
-            np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['weighted_pool_bayesian_estimation_error'],
-                       delimiter=',')
-            np.savetxt(output_dir + "weighted_pool_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['weighted_pool_frequentist_estimation_error'], delimiter=',')
-
-            ## weighted estimation error, weight of each bin is estiamted with observed labeled data
-            np.savetxt(output_dir + "weighted_online_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['weighted_online_bayesian_estimation_error'],
-                       delimiter=',')
-            np.savetxt(output_dir + "weighted_online_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['weighted_online_frequentist_estimation_error'], delimiter=',')
-
-            ## unweighted estimation error
-            np.savetxt(output_dir + "unweighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['unweighted_bayesian_estimation_error'],
-                       delimiter=',')
-            np.savetxt(output_dir + "unweighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (
-                DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['unweighted_frequentist_estimation_error'],
-                       delimiter=',')
-
-            ## ece, weight of each bin is estiamted by pooling all unlabeled data
-            np.savetxt(output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['pool_bayesian_ece'],
-                       delimiter=',')
-            np.savetxt(
-                output_dir + "pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                estimation_error_output['pool_frequentist_ece'],
-                delimiter=',')
-
-            ## ece, weight of each bin is estiamted with observed labeled data
-            np.savetxt(output_dir + "online_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['online_bayesian_ece'],
-                       delimiter=',')
-            np.savetxt(
-                output_dir + "online_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                estimation_error_output['online_frequentist_ece'],
-                delimiter=',')
-
-            ## mce
-            np.savetxt(output_dir + "mce_%s_PseudoCount%.1f_runs%d_bayesian.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                       estimation_error_output['bayesian_mce'],
-                       delimiter=',')
-            np.savetxt(
-                output_dir + "mce_%s_PseudoCount%.1f_runs%d_frequentist.csv" % (DATASET, pseudo_n, NUM_RUNS),
-                estimation_error_output['frequentist_mce'],
-                delimiter=',')
+            for metric in estimation_error_output:
+                np.savetxt(output_dir + output_str_dict[metric] % (
+                    DATASET, pseudo_n, NUM_RUNS),
+                           estimation_error_output[metric],
+                           delimiter=',')
 
 
 def run_true_calibration_error(DATASET):
-    if DATASET == "cifar100":  # 10,000
-        datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
-    elif DATASET == 'imagenet':  # 50,000
-        datafile = '../data/imagenet/resnet152_imagenet_outputs.txt'
-    elif DATASET == 'imagenet2_topimages':  # 10,000
-        datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
-    elif DATASET == '20newsgroup':  # 5607
-        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
-    elif DATASET == 'svhn':
-        datafile = '../data/svhn/svhn_predictions.txt'
-    elif DATASET == 'dbpedia':
-        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
-
-    results = get_ground_truth(datafile)
+    results = get_ground_truth(datafile_dict[DATASET])
 
     calibration_error_ground_truth_filename = "../output/calibration_error_ground_truth.csv"
     if not os.path.exists(calibration_error_ground_truth_filename):
@@ -321,28 +272,10 @@ def run_true_calibration_error(DATASET):
 def run_reliability_diagrams(DATASET, PRIORTYPE):
     VAR_list = [0.01, 0.05, 0.10, 0.25]  # takes value from (0, 0.25); variance of beta prior
     PSEUDOCOUNT = [0.1, 1, 10]
-
-    if DATASET == "cifar100":  # 10,000
-        N_list = [100, 1000, 10000]
-        datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
-    elif DATASET == 'imagenet':  # 50,000
-        N_list = [100, 1000, 50000]
-        datafile = '../data/imagenet/resnet152_imagenet_outputs.txt'
-    elif DATASET == 'imagenet2_topimages':  # 10,000
-        N_list = [100, 1000, 10000]
-        datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
-    elif DATASET == '20newsgroup':  # 5607
-        N_list = [100, 1000, 5607]
-        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
-    elif DATASET == 'svhn':
-        N_list = [100, 1000, 26032]
-        datafile = '../data/svhn/svhn_predictions.txt'
-    elif DATASET == 'dbpedia':
-        N_list = [100, 1000, 70000]
-        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
+    N_list = [100, 1000, datasize_dict[DATASET]]
 
     for N in N_list:
-        confidence, Y_predict, Y_true = prepare_data(datafile, N)
+        confidence, Y_predict, Y_true = prepare_data(datafile_dict[DATASET], N)
         if PRIORTYPE == 'fixed_var':
             for VAR in VAR_list:
                 figname = "../figures/reliability_diagram/reliability_plot_%s_N%d_VAR%.2f.pdf" % (DATASET, N, VAR)
@@ -364,7 +297,7 @@ if __name__ == "__main__":
 
     dataset = str(sys.argv[1])
     if dataset not in DATASET_LIST:
-        raise ValueError("%s is not in DATASET_LIST." % dataset) 
+        raise ValueError("%s is not in DATASET_LIST." % dataset)
 
     run_calibration_error(dataset, PRIORTYPE, NUM_RUNS)
 
