@@ -144,6 +144,86 @@ class DirichletMultinomialCost(Model):
         return expected_costs
 
 
+class SumOfBetaEce(Model):
+    """Model ECE as weighted sum of absolute shifted Beta distributions, with each Beta distribution capturing the accuracy per bin.
+
+    Parameters
+    ==========
+    weight: np.ndarray (k, ), weight of each bin.
+    prior_alpha: np.ndarray (k, ), alpha parameter of the Beta distribution for each bin
+    prior_beta: np.ndarray (k, ), beta parameter of the Beta distribution for each bin
+    """
+
+    def __init__(self, k: int, weight: None, prior_alpha: None, prior_beta: None):
+        # constants
+        self._k = k
+        self._weight = weight
+        self._diagonal = np.array([(i + 0.5) / k for i in range(0, k)])
+
+        # parameters to update:
+        self._alpha = None  #
+        self._beta = None
+        self._counts = np.zeros((k,))
+
+        # initialize the mode of each Beta distribution on diagonal
+        peusdo_count = 10
+        if prior_alpha is None:
+            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / k + 1 for i in range(self._k)])
+        else:
+            self._alpha = np.copy(prior_alpha)
+
+        if prior_beta is None:
+            self._beta = np.array(
+                [(self._alpha[i] - 1) * self._k / (i + 0.5) - (self._alpha[i] - 2) for i in range(self._k)])
+        else:
+            self._beta = np.copy(prior_beta)
+
+    @property
+    def ece(self):
+        theta = self._alpha / (self._alpha + self._beta)
+        if self._weight:  # pool weights
+            weight = self._weight
+        else:  # online weights
+            weight = self._counts / sum(self._counts)
+
+        return weight * np.abs(theta - self._diagonal)
+
+    def sample(self, n_samples: int = 1) -> np.ndarray:
+        """Draw samples from the posterior distribution of ECE.
+
+        Parameters
+        ==========
+        :param n_samples:
+        :return:
+        """
+
+        # draw samples from each Beta distribution
+        theta = np.random.beta(self._alpha, self._beta, size=(n_samples, self._k))  # theta: (n_samples, k)
+        # compute ECE with samples
+
+        if self._weight:  # pool weights
+            weight = self._weight
+        else:  # online weights
+            weight = self._counts / sum(self._counts)
+
+        return weight * np.abs(theta - self._diagonal)
+
+    def update(self, predicted_class: int, true_class: int):
+        """ update self._alpha, self._beta, self._counts
+
+        Parameters
+        ==========
+        :param predicted_class:
+        :param true_class:
+        :return:
+        """
+        if true_class == predicted_class:
+            self._alpha[predicted_class] += 1
+        else:
+            self._beta[predicted_class] += 1
+        self._counts[predicted_class] += 1
+
+
 class SpikeAndBetaSlab(Model):
     """
     Spike(on diagonal) and slab (beta distribution) for modeling calibration of the model.
@@ -152,9 +232,10 @@ class SpikeAndBetaSlab(Model):
 
     Parameters
     ==========
-    mu: np.ndarray (k, ), weight on the spike component for each bin
-    alpha: np.ndarray (k, ), alpha parameter of the Beta distribution for each bin
-    beta: np.ndarray (k, ), beta parameter of the Beta distribution for each bin
+    k: int, number of bins
+    prior_mu: np.ndarray (k, ), weight on the spike component for each bin
+    prior_alpha: np.ndarray (k, ), alpha parameter of the Beta distribution for each bin
+    prior_beta: np.ndarray (k, ), beta parameter of the Beta distribution for each bin
     """
 
     def __init__(self, k: int, prior_mu: None, prior_alpha: None, prior_beta: None):
