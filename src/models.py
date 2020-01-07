@@ -81,10 +81,20 @@ class BetaBernoulli(Model):
             else:
                 self._params[category, 1] += 1
 
-    def sample(self):
-        """Draw sample thetas from the posterior."""
-        theta = np.random.beta(self._params[:, 0], self._params[:, 1])
-        return np.array(theta)
+    def sample(self, num_samples) -> np.ndarray:
+        """Draw sample thetas from the posterior.
+
+        Parameters
+        ==========
+        num_samples : int
+            Number of times to sample from posterior. Default: 1.
+
+        Returns
+        =======
+        An (k, num_samples) array of samples of theta. If num_samples == 1 then last dimension is squeezed.
+        """
+        theta = np.random.beta(self._params[:, 0], self._params[:, 1], size=(num_samples, self._k))
+        return np.array(theta).T.squeeze()
 
     def get_params(self):
         return self._params
@@ -165,6 +175,13 @@ class SumOfBetaEce(Model):
     """
 
     def __init__(self, num_bins: int, weight: None, prior_alpha: None, prior_beta: None):
+        """
+
+        :param num_bins:
+        :param weight:
+        :param prior_alpha:
+        :param prior_beta:
+        """
         # constants
         self._num_bins = num_bins
         self._weight = weight
@@ -173,7 +190,8 @@ class SumOfBetaEce(Model):
         # parameters to update:
         self._alpha = None
         self._beta = None
-        self._counts = np.zeros((num_bins,))
+        self._counts = np.ones((num_bins,)) * 0.0001
+        self._confidence = np.zeros((num_bins,))
 
         # initialize the mode of each Beta distribution on diagonal
         peusdo_count = 10
@@ -197,27 +215,30 @@ class SumOfBetaEce(Model):
         else:  # online weights
             weight = self._counts / sum(self._counts)
 
-        return weight * np.abs(theta - self._diagonal)
+        return weight * np.abs(theta - self._confidence)
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample ECEs from posterior.
 
         Parameters
         ==========
-        :param num_samples:
-        :return:
+        num_samples : int
+            Number of times to sample from posterior. Default: 1.
+
+        Returns
+        =======
+        An (num_samples, ) array of ECE. If n_samples == 1 then last dimension is squeezed.
         """
 
         # draw samples from each Beta distribution
-        theta = np.random.beta(self._alpha, self._beta, size=(num_samples, self._num_bins))  # theta: (n_samples, k)
+        theta = np.random.beta(self._alpha, self._beta,
+                               size=(num_samples, self._num_bins))  # theta: (n_samples, num_bins)
         # compute ECE with samples
-
         if self._weight:  # pool weights
             weight = self._weight
         else:  # online weights
             weight = self._counts / sum(self._counts)
-
-        return weight * np.abs(theta - self._diagonal)
+        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
 
     def update(self, score: float, prediction: bool):
         """
@@ -227,11 +248,25 @@ class SumOfBetaEce(Model):
         :return:
         """
         bin_idx = math.floor(score * self._num_bins)
+        if score == 1:
+            bin_idx -= 1
         if prediction:
             self._alpha[bin_idx] += 1
         else:
             self._beta[bin_idx] += 1
+        self._confidence[bin_idx] = (self._confidence[bin_idx] * self._counts[bin_idx] + score) / (
+                self._counts[bin_idx] + 1)
         self._counts[bin_idx] += 1
+
+    def update_batch(self, scores: List[float], predictions: List[bool]):
+        """
+
+        :param scores:
+        :param predictions:
+        :return:
+        """
+        for score, prediction in zip(scores, predictions):
+            self.update(score, prediction)
 
 
 class SpikeAndBetaSlab(Model):
