@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from active_utils import prepare_data, SAMPLE_CATEGORY
+from data_utils import datafile_dict, num_classes_dict
 from models import BetaBernoulli
 
 COLUMN_WIDTH = 3.25  # Inches
@@ -71,7 +72,7 @@ def get_samples(categories: List[int],
                 mode: str,
                 metric: str,
                 prior=None,
-                random_seed: int =0) -> Tuple[np.ndarray, np.ndarray]:
+                random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray]:
     # prepare model, deques, thetas, choices
     random.seed(random_seed)
 
@@ -96,7 +97,7 @@ def get_samples(categories: List[int],
                                                            max_ttts_trial=50,
                                                            ttts_beta=0.5,
                                                            epsilon=0.1,
-                                                           ucb_c=1,)
+                                                           ucb_c=1, )
         # update model, deques, thetas, choices
         model.update(category, deques[category].pop())
 
@@ -127,30 +128,12 @@ def comparison_plot(success_rate_dict, figname) -> None:
 
 def main(RUNS, MODE, METRIC, DATASET):
     if DATASET == 'cifar100':
-        # datafile = "../data/cifar100/cifar100_predictions_dropout.txt"
-        datafile = '../data/cifar100/predictions.txt'
         FOUR_COLUMN = True  # format of input
-        NUM_CLASSES = 100
-    elif DATASET == 'svhn':
-        datafile = '../data/svhn/svhn_predictions.txt'
+    else:
         FOUR_COLUMN = False  # format of input
-        NUM_CLASSES = 10
-    elif DATASET == 'imagenet':
-        datafile = '../data/imagenet/resnet152_imagenet_outputs.txt'
-        NUM_CLASSES = 1000
-        FOUR_COLUMN = False
-    elif DATASET == 'imagenet2_topimages':
-        datafile = '../data/imagenet/resnet152_imagenetv2_topimages_outputs.txt'
-        NUM_CLASSES = 1000
-        FOUR_COLUMN = False
-    elif DATASET == '20newsgroup':  # 5607
-        datafile = "../data/20newsgroup/bert_20_newsgroups_outputs.txt"
-        NUM_CLASSES = 20
-        FOUR_COLUMN = False
-    elif DATASET == 'dbpedia':  # 70000
-        datafile = '../data/dbpedia/bert_dbpedia_outputs.txt'
-        NUM_CLASSES = 14
-        FOUR_COLUMN = False
+
+    datafile = datafile_dict[DATASET]
+    NUM_CLASSES = num_classes_dict[DATASET]
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, FOUR_COLUMN)
     N = len(observations)

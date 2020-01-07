@@ -2,6 +2,7 @@
 Bayesian blackbox assesment models.
 """
 import math
+from typing import List
 
 import numpy as np
 from scipy.stats import beta
@@ -71,6 +72,14 @@ class BetaBernoulli(Model):
             self._params[category, 0] += 1
         else:
             self._params[category, 1] += 1
+
+    def update_batch(self, categories: List[int], observations: List[bool]):
+        """Updates the posterior of the Beta-Bernoulli model for a batch of observations."""
+        for category, observation in zip(categories, observations):
+            if observation:
+                self._params[category, 0] += 1
+            else:
+                self._params[category, 1] += 1
 
     def sample(self):
         """Draw sample thetas from the posterior."""
@@ -149,32 +158,34 @@ class SumOfBetaEce(Model):
 
     Parameters
     ==========
-    weight: np.ndarray (k, ), weight of each bin.
-    prior_alpha: np.ndarray (k, ), alpha parameter of the Beta distribution for each bin
-    prior_beta: np.ndarray (k, ), beta parameter of the Beta distribution for each bin
+    num_bins: number of bins for calibration
+    weight: np.ndarray (num_bins, ), weight of each bin.
+    prior_alpha: np.ndarray (num_bins, ), alpha parameter of the Beta distribution for each bin
+    prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
     """
 
-    def __init__(self, k: int, weight: None, prior_alpha: None, prior_beta: None):
+    def __init__(self, num_bins: int, weight: None, prior_alpha: None, prior_beta: None):
         # constants
-        self._k = k
+        self._num_bins = num_bins
         self._weight = weight
-        self._diagonal = np.array([(i + 0.5) / k for i in range(0, k)])
+        self._diagonal = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
 
         # parameters to update:
-        self._alpha = None  #
+        self._alpha = None
         self._beta = None
-        self._counts = np.zeros((k,))
+        self._counts = np.zeros((num_bins,))
 
         # initialize the mode of each Beta distribution on diagonal
         peusdo_count = 10
         if prior_alpha is None:
-            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / k + 1 for i in range(self._k)])
+            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
         else:
             self._alpha = np.copy(prior_alpha)
 
         if prior_beta is None:
             self._beta = np.array(
-                [(self._alpha[i] - 1) * self._k / (i + 0.5) - (self._alpha[i] - 2) for i in range(self._k)])
+                [(self._alpha[i] - 1) * self._num_bins / (i + 0.5) - (self._alpha[i] - 2) for i in
+                 range(self._num_bins)])
         else:
             self._beta = np.copy(prior_beta)
 
@@ -188,17 +199,17 @@ class SumOfBetaEce(Model):
 
         return weight * np.abs(theta - self._diagonal)
 
-    def sample(self, n_samples: int = 1) -> np.ndarray:
-        """Draw samples from the posterior distribution of ECE.
+    def sample(self, num_samples: int = 1) -> np.ndarray:
+        """Draw sample ECEs from posterior.
 
         Parameters
         ==========
-        :param n_samples:
+        :param num_samples:
         :return:
         """
 
         # draw samples from each Beta distribution
-        theta = np.random.beta(self._alpha, self._beta, size=(n_samples, self._k))  # theta: (n_samples, k)
+        theta = np.random.beta(self._alpha, self._beta, size=(num_samples, self._num_bins))  # theta: (n_samples, k)
         # compute ECE with samples
 
         if self._weight:  # pool weights
@@ -208,20 +219,19 @@ class SumOfBetaEce(Model):
 
         return weight * np.abs(theta - self._diagonal)
 
-    def update(self, predicted_class: int, true_class: int):
-        """ update self._alpha, self._beta, self._counts
+    def update(self, score: float, prediction: bool):
+        """
 
-        Parameters
-        ==========
-        :param predicted_class:
-        :param true_class:
+        :param score:
+        :param prediction:
         :return:
         """
-        if true_class == predicted_class:
-            self._alpha[predicted_class] += 1
+        bin_idx = math.floor(score * self._num_bins)
+        if prediction:
+            self._alpha[bin_idx] += 1
         else:
-            self._beta[predicted_class] += 1
-        self._counts[predicted_class] += 1
+            self._beta[bin_idx] += 1
+        self._counts[bin_idx] += 1
 
 
 class SpikeAndBetaSlab(Model):
