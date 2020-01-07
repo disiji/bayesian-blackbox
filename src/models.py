@@ -194,7 +194,7 @@ class SumOfBetaEce(Model):
         self._confidence = np.zeros((num_bins,))
 
         # initialize the mode of each Beta distribution on diagonal
-        peusdo_count = 10
+        peusdo_count = 5
         if prior_alpha is None:
             self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
         else:
