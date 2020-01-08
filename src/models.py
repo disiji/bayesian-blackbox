@@ -1,6 +1,7 @@
 """
 Bayesian blackbox assesment models.
 """
+import copy
 import math
 from typing import List
 
@@ -63,7 +64,7 @@ class BetaBernoulli(Model):
             self._params = prior
 
     @property
-    def theta(self):
+    def eval(self):
         return self._params[:, 0] / (self._params[:, 0] + self._params[:, 1])
 
     def update(self, category: int, observation: bool):
@@ -104,6 +105,179 @@ class BetaBernoulli(Model):
 
     def get_overall_acc(self, weight):
         return np.dot(beta.mean(self._params[:, 0], self._params[:, 1]), weight)
+
+
+class SumOfBetaEce(Model):
+    """Model ECE as weighted sum of absolute shifted Beta distributions, with each Beta distribution capturing the accuracy per bin.
+
+    Parameters
+    ==========
+    num_bins: number of bins for calibration
+    weight: np.ndarray (num_bins, ), weight of each bin.
+    prior_alpha: np.ndarray (num_bins, ), alpha parameter of the Beta distribution for each bin
+    prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
+    """
+
+    def __init__(self, num_bins: int, weight: None, prior_alpha: None, prior_beta: None):
+        """
+
+        :param num_bins:
+        :param weight:
+        :param prior_alpha:
+        :param prior_beta:
+        """
+        # constants
+        self._num_bins = num_bins
+        self._weight = weight
+        self._diagonal = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
+
+        # parameters to update:
+        self._alpha = None
+        self._beta = None
+        self._counts = np.ones((num_bins,)) * 0.0001
+        self._confidence = np.zeros((num_bins,))
+
+        # initialize the mode of each Beta distribution on diagonal
+        peusdo_count = 5
+        if prior_alpha is None:
+            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
+        else:
+            self._alpha = np.copy(prior_alpha)
+
+        if prior_beta is None:
+            self._beta = np.array(
+                [(self._alpha[i] - 1) * self._num_bins / (i + 0.5) - (self._alpha[i] - 2) for i in
+                 range(self._num_bins)])
+        else:
+            self._beta = np.copy(prior_beta)
+
+    @property
+    def eval(self):
+        theta = self._alpha / (self._alpha + self._beta)
+        if self._weight:  # pool weights
+            weight = self._weight
+        else:  # online weights
+            weight = self._counts / sum(self._counts)
+
+        return weight * np.abs(theta - self._confidence)
+
+    def sample(self, num_samples: int = 1) -> np.ndarray:
+        """Draw sample ECEs from posterior.
+
+        Parameters
+        ==========
+        num_samples : int
+            Number of times to sample from posterior. Default: 1.
+
+        Returns
+        =======
+        An (num_samples, ) array of ECE. If n_samples == 1 then last dimension is squeezed.
+        """
+
+        # draw samples from each Beta distribution
+        theta = np.random.beta(self._alpha, self._beta,
+                               size=(num_samples, self._num_bins))  # theta: (n_samples, num_bins)
+        # compute ECE with samples
+        if self._weight:  # pool weights
+            weight = self._weight
+        else:  # online weights
+            weight = self._counts / sum(self._counts)
+        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
+
+    def update(self, score: float, observation: bool):
+        """
+
+        :param score:
+        :param prediction:
+        :return:
+        """
+        bin_idx = math.floor(score * self._num_bins)
+        if score == 1:
+            bin_idx -= 1
+        if observation:
+            self._alpha[bin_idx] += 1
+        else:
+            self._beta[bin_idx] += 1
+        self._confidence[bin_idx] = (self._confidence[bin_idx] * self._counts[bin_idx] + score) / (
+                self._counts[bin_idx] + 1)
+        self._counts[bin_idx] += 1
+
+    def update_batch(self, scores: List[float], observations: List[bool]):
+        """
+
+        :param scores:
+        :param predictions:
+        :return:
+        """
+        for score, observation in zip(scores, observations):
+            self.update(score, observation)
+
+
+class ClasswiseEce(Model):
+    """
+
+    """
+
+    def __init__(self, k: int, num_bins: int, weight: None, prior=None):
+        """
+        Parameters
+        ==========
+        k: number of classes
+        num_bins: number of bins for evaluating ECE
+        weight: a list of (num_bins, ) arrays of length k
+        prior: an (number of classes, k, 2) array for alpha and beta parameters in the prior Beta distributions.
+
+
+        Returns
+        =======
+        """
+        self._k = k
+
+        if weight is None:
+            weight = [None] * self._k
+
+        if prior is None:
+            self._classwise_ece_models = [
+                copy.deepcopy(SumOfBetaEce(num_bins, weight[i], prior_alpha=None, prior_beta=None))
+                for i in range(k)]
+        else:
+            self._classwise_ece_models = [
+                copy.deepcopy(SumOfBetaEce(num_bins, weight[i], prior_alpha=prior[i, :, 0].squeeze(),
+                                           prior_beta=prior[i, :, 1].squeeze()))
+                for i in range(k)]
+
+    def update(self, category: int, observation: bool, score: float):
+        """
+
+        :param category:
+        :param observation:
+        :param score:
+        :return:
+        """
+        self._classwise_ece_models[category].update(score, observation)
+
+    def update_batch(self, categories: List[int], observations: List[bool], scores: List[float]):
+        """
+
+        :param categories:
+        :param observations:
+        :param scores:
+        :return:
+        """
+        for (category, observation, score) in zip(categories, observations, scores):
+            self.update(category, observation, score)
+
+    @property
+    def eval(self) -> np.ndarray:
+        """
+        Evaluate ECE for each class
+
+        Returns
+        =======
+        An (k,) array of ECE evaluate for each class.
+        """
+        classwise_ece = np.array([self._classwise_ece_models[i].eval for i in range(self._k)])
+        return classwise_ece
 
 
 class DirichletMultinomialCost(Model):
@@ -161,112 +335,6 @@ class DirichletMultinomialCost(Model):
         expected_probs = self._alphas / z
         expected_costs = (self._costs * expected_probs).sum(axis=-1)
         return expected_costs
-
-
-class SumOfBetaEce(Model):
-    """Model ECE as weighted sum of absolute shifted Beta distributions, with each Beta distribution capturing the accuracy per bin.
-
-    Parameters
-    ==========
-    num_bins: number of bins for calibration
-    weight: np.ndarray (num_bins, ), weight of each bin.
-    prior_alpha: np.ndarray (num_bins, ), alpha parameter of the Beta distribution for each bin
-    prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
-    """
-
-    def __init__(self, num_bins: int, weight: None, prior_alpha: None, prior_beta: None):
-        """
-
-        :param num_bins:
-        :param weight:
-        :param prior_alpha:
-        :param prior_beta:
-        """
-        # constants
-        self._num_bins = num_bins
-        self._weight = weight
-        self._diagonal = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
-
-        # parameters to update:
-        self._alpha = None
-        self._beta = None
-        self._counts = np.ones((num_bins,)) * 0.0001
-        self._confidence = np.zeros((num_bins,))
-
-        # initialize the mode of each Beta distribution on diagonal
-        peusdo_count = 5
-        if prior_alpha is None:
-            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
-        else:
-            self._alpha = np.copy(prior_alpha)
-
-        if prior_beta is None:
-            self._beta = np.array(
-                [(self._alpha[i] - 1) * self._num_bins / (i + 0.5) - (self._alpha[i] - 2) for i in
-                 range(self._num_bins)])
-        else:
-            self._beta = np.copy(prior_beta)
-
-    @property
-    def ece(self):
-        theta = self._alpha / (self._alpha + self._beta)
-        if self._weight:  # pool weights
-            weight = self._weight
-        else:  # online weights
-            weight = self._counts / sum(self._counts)
-
-        return weight * np.abs(theta - self._confidence)
-
-    def sample(self, num_samples: int = 1) -> np.ndarray:
-        """Draw sample ECEs from posterior.
-
-        Parameters
-        ==========
-        num_samples : int
-            Number of times to sample from posterior. Default: 1.
-
-        Returns
-        =======
-        An (num_samples, ) array of ECE. If n_samples == 1 then last dimension is squeezed.
-        """
-
-        # draw samples from each Beta distribution
-        theta = np.random.beta(self._alpha, self._beta,
-                               size=(num_samples, self._num_bins))  # theta: (n_samples, num_bins)
-        # compute ECE with samples
-        if self._weight:  # pool weights
-            weight = self._weight
-        else:  # online weights
-            weight = self._counts / sum(self._counts)
-        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
-
-    def update(self, score: float, prediction: bool):
-        """
-
-        :param score:
-        :param prediction:
-        :return:
-        """
-        bin_idx = math.floor(score * self._num_bins)
-        if score == 1:
-            bin_idx -= 1
-        if prediction:
-            self._alpha[bin_idx] += 1
-        else:
-            self._beta[bin_idx] += 1
-        self._confidence[bin_idx] = (self._confidence[bin_idx] * self._counts[bin_idx] + score) / (
-                self._counts[bin_idx] + 1)
-        self._counts[bin_idx] += 1
-
-    def update_batch(self, scores: List[float], predictions: List[bool]):
-        """
-
-        :param scores:
-        :param predictions:
-        :return:
-        """
-        for score, prediction in zip(scores, predictions):
-            self.update(score, prediction)
 
 
 class SpikeAndBetaSlab(Model):
