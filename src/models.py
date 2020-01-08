@@ -67,6 +67,10 @@ class BetaBernoulli(Model):
     def eval(self):
         return self._params[:, 0] / (self._params[:, 0] + self._params[:, 1])
 
+    @property
+    def variance(self):
+        return beta.var(self._params[:, 0], self._params[:, 1])
+
     def update(self, category: int, observation: bool):
         """Updates the posterior of the Beta-Bernoulli model."""
         if observation:
@@ -99,9 +103,6 @@ class BetaBernoulli(Model):
 
     def get_params(self):
         return self._params
-
-    def get_variance(self):
-        return beta.var(self._params[:, 0], self._params[:, 1])
 
     def get_overall_acc(self, weight):
         return np.dot(beta.mean(self._params[:, 0], self._params[:, 1]), weight)
@@ -159,7 +160,16 @@ class SumOfBetaEce(Model):
         else:  # online weights
             weight = self._counts / sum(self._counts)
 
-        return weight * np.abs(theta - self._confidence)
+        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
+
+    @property
+    def variance(self):
+        variance_bin = beta.var(self._alpha, self._beta)
+        if self._weight:  # pool weights
+            weight = self._weight
+        else:  # online weights
+            weight = self._counts / sum(self._counts)
+        return np.inner(weight * weight, variance_bin)
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample ECEs from posterior.
@@ -278,6 +288,19 @@ class ClasswiseEce(Model):
         """
         classwise_ece = np.array([self._classwise_ece_models[class_idx].eval for class_idx in range(self._k)])
         return classwise_ece
+
+    @property
+    def variance(self):
+        """
+        Variance of posterior ECE for each class
+
+        Returns
+        =======
+        An (k,) array of variance evaluate for each class.
+        """
+        classwise_ece_variance = np.array(
+            [self._classwise_ece_models[class_idx].variance for class_idx in range(self._k)])
+        return classwise_ece_variance
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample eces from the posterior.

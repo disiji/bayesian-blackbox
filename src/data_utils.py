@@ -39,3 +39,5 @@ output_str_dict = {
     'bayesian_mce': 'mce_%s_PseudoCount%.1f_runs%d_bayesian.csv',
     'frequentist_mce': 'mce_%s_PseudoCount%.1f_runs%d_frequentist.csv'
 }
+
+DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']

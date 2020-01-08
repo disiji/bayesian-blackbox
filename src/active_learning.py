@@ -1,6 +1,7 @@
 import copy
 import pickle
 import random
+import sys
 from collections import deque
 from typing import List, Tuple
 
@@ -8,7 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from active_utils import prepare_data, SAMPLE_CATEGORY, eval_ece
-from data_utils import datafile_dict, num_classes_dict
+from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 
 COLUMN_WIDTH = 3.25  # Inches
@@ -154,7 +155,6 @@ def comparison_plot(success_rate_dict, figname) -> None:
 
 
 def main_accuracy(RUNS, MODE, DATASET):
-
     datafile = datafile_dict[DATASET]
     NUM_CLASSES = num_classes_dict[DATASET]
 
@@ -244,17 +244,17 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                            metric='accuracy',
                                                            prior=UNIFORM_PRIOR,
                                                            random_seed=r)
-        # print(r, 'bayesian_ucb')
-        # success_rate_dict['bayesian_ucb'] += get_samples(categories,
-        #                                                  observations,
-        #                                                  confidences,
-        #                                                  NUM_CLASSES,
-        #                                                  N,
-        #                                                  sample_method='bayesian_ucb',
-        #                                                  mode=MODE,
-        #                                                  metric='accuracy',
-        #                                                  prior=UNIFORM_PRIOR,
-        #                                                  random_seed=r)
+        print(r, 'bayesian_ucb')
+        success_rate_dict['bayesian_ucb'] += get_samples(categories,
+                                                         observations,
+                                                         confidences,
+                                                         NUM_CLASSES,
+                                                         N,
+                                                         sample_method='bayesian_ucb',
+                                                         mode=MODE,
+                                                         metric='accuracy',
+                                                         prior=UNIFORM_PRIOR,
+                                                         random_seed=r)
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
@@ -267,7 +267,6 @@ def main_accuracy(RUNS, MODE, DATASET):
 
 
 def main_calibration_error(RUNS, MODE, DATASET):
-
     datafile = datafile_dict[DATASET]
     NUM_CLASSES = num_classes_dict[DATASET]
 
@@ -329,17 +328,17 @@ def main_calibration_error(RUNS, MODE, DATASET):
                                                            metric='calibration_error',
                                                            prior=None,
                                                            random_seed=r)
-        # print(r, 'bayesian_ucb')
-        # success_rate_dict['bayesian_ucb'] += get_samples(categories,
-        #                                                  observations,
-        #                                                  confidences,
-        #                                                  NUM_CLASSES,
-        #                                                  N,
-        #                                                  sample_method='bayesian_ucb',
-        #                                                  mode=MODE,
-        #                                                  metric='calibration_error',
-        #                                                  prior=None,
-        #                                                  random_seed=r)
+        print(r, 'bayesian_ucb')
+        success_rate_dict['bayesian_ucb'] += get_samples(categories,
+                                                         observations,
+                                                         confidences,
+                                                         NUM_CLASSES,
+                                                         N,
+                                                         sample_method='bayesian_ucb',
+                                                         mode=MODE,
+                                                         metric='calibration_error',
+                                                         prior=None,
+                                                         random_seed=r)
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
@@ -353,11 +352,13 @@ def main_calibration_error(RUNS, MODE, DATASET):
 
 if __name__ == "__main__":
 
-    RUNS = 10
+    RUNS = 100
 
-    # for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
-    for DATASET in ['cifar100']:
-        for MODE in ['min', 'max']:
-            print(DATASET, MODE, '...')
-            # main_accuracy(RUNS, MODE, DATASET)
-            main_calibration_error(RUNS, MODE, DATASET)
+    dataset = str(sys.argv[1])
+    if dataset not in DATASET_LIST:
+        raise ValueError("%s is not in DATASET_LIST." % dataset)
+
+    for MODE in ['min', 'max']:
+        print(dataset, MODE, '...')
+        main_accuracy(RUNS, MODE, dataset)
+        main_calibration_error(RUNS, MODE, dataset)

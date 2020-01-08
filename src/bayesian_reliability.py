@@ -5,7 +5,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import numpy as np
-from data_utils import datafile_dict, datasize_dict, output_str_dict
+from data_utils import datafile_dict, datasize_dict, output_str_dict, DATASET_LIST
 from scipy import stats
 
 num_cores = multiprocessing.cpu_count()
@@ -259,9 +259,6 @@ if __name__ == "__main__":
     NUM_BINS = 10
     PRIORTYPE = 'pseudocount'  #
     NUM_RUNS = 100
-
-    # DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-    DATASET_LIST = ['cifar100']
 
     dataset = str(sys.argv[1])
     if dataset not in DATASET_LIST:

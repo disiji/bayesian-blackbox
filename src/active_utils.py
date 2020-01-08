@@ -60,6 +60,7 @@ def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
     :param num_bins:
     :return:
     """
+    confidences = np.array(confidences)
     observations = np.array(observations) * 1.0
     bins = np.linspace(0, 1, num_bins + 1)
     digitized = np.digitize(confidences, bins[1:-1])
@@ -136,34 +137,29 @@ def epsilon_greedy(deques: List[deque],
             ranked = np.argsort(samples)[::-1]
         elif mode == 'min':
             ranked = np.argsort(samples)
+
         for j in range(len(deques)):
             category = ranked[j]
             if len(deques[category]) != 0:
                 return category
 
 
-#todo: implement get_variance for ece models
-# def bayesian_UCB(deques: List[deque],
-#                  model: BetaBernoulli,
-#                  mode: str,
-#                  confidence_k: np.ndarray = None,
-#                  ucb_c: int = 1,
-#                  **kwargs) -> int:
-#     # get mean of metric_val
-#     if metric == 'accuracy':
-#         metric_val = model.eval
-#     elif metric == 'calibration_bias':
-#         metric_val = confidence_k - model.eval
-#     if mode == 'max':
-#         metric_val += ucb_c * model.get_variance()
-#         ranked = np.argsort(metric_val)[::-1]
-#     elif mode == 'min':
-#         metric_val -= ucb_c * model.get_variance()
-#         ranked = np.argsort(metric_val)
-#     for j in range(len(deques)):
-#         category = ranked[j]
-#         if len(deques[category]) != 0:
-#             return category
+def bayesian_UCB(deques: List[deque],
+                 model: BetaBernoulli,
+                 mode: str,
+                 ucb_c: int = 1,
+                 **kwargs) -> int:
+    metric_val = model.eval
+    if mode == 'max':
+        metric_val += ucb_c * model.variance
+        ranked = np.argsort(metric_val)[::-1]
+    elif mode == 'min':
+        metric_val -= ucb_c * model.variance
+        ranked = np.argsort(metric_val)
+    for j in range(len(deques)):
+        category = ranked[j]
+        if len(deques[category]) != 0:
+            return category
 
 
 SAMPLE_CATEGORY = {
@@ -171,5 +167,5 @@ SAMPLE_CATEGORY = {
     'ts': thompson_sampling,
     'ttts': top_two_thompson_sampling,
     'epsilon_greedy': epsilon_greedy,
-    # 'bayesian_ucb': bayesian_UCB
+    'bayesian_ucb': bayesian_UCB
 }
