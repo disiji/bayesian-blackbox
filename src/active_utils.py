@@ -52,6 +52,30 @@ def prepare_data(filename, four_column=False):
     return categories, observations, confidences, idx2category, category2idx
 
 
+def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
+    """
+
+    :param confidences:
+    :param observations:
+    :param num_bins:
+    :return:
+    """
+    observations = np.array(observations) * 1.0
+    bins = np.linspace(0, 1, num_bins + 1)
+    digitized = np.digitize(confidences, bins[1:-1])
+
+    w = np.array([(digitized == i).sum() for i in range(num_bins)])
+    w = w / sum(w)
+
+    confidence_bins = np.array([confidences[digitized == i].mean() for i in range(num_bins)])
+    accuracy_bins = np.array([observations[digitized == i].mean() for i in range(num_bins)])
+    confidence_bins[np.isnan(confidence_bins)] = 0
+    accuracy_bins[np.isnan(accuracy_bins)] = 0
+    diff = np.absolute(confidence_bins - accuracy_bins)
+    ece = np.inner(diff, w)
+    return ece
+
+
 def random_sampling(deques: List[deque], **kwargs) -> int:
     while True:
         # select each class randomly
@@ -116,7 +140,7 @@ def epsilon_greedy(deques: List[deque],
     if random.random() < epsilon:
         return random_sampling(deques)
     else:
-        theta_hat = model.theta
+        theta_hat = model.eval
         if metric == 'accuracy':
             metric_val = theta_hat
         elif metric == 'calibration_bias':
@@ -140,9 +164,9 @@ def bayesian_UCB(deques: List[deque],
                  **kwargs) -> int:
     # get mean of metric_val
     if metric == 'accuracy':
-        metric_val = model.theta
+        metric_val = model.eval
     elif metric == 'calibration_bias':
-        metric_val = confidence_k - model.theta
+        metric_val = confidence_k - model.eval
     if mode == 'max':
         metric_val += ucb_c * model.get_variance()
         ranked = np.argsort(metric_val)[::-1]

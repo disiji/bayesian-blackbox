@@ -7,7 +7,7 @@ from typing import List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from active_utils import prepare_data, SAMPLE_CATEGORY
+from active_utils import prepare_data, SAMPLE_CATEGORY, eval_ece
 from data_utils import datafile_dict, num_classes_dict
 from models import BetaBernoulli
 
@@ -35,9 +35,31 @@ def _get_confidence_k(categories: List[int], confidences: List[float], num_class
 def _get_accuracy_k(categories: List[int], observations: List[bool], num_classes: int) -> np.ndarray:
     observations = np.array(observations) * 1.0
     df = pd.DataFrame(list(zip(categories, observations)), columns=['Predicted', 'Observations'])
-    accuracy_k = np.array([df[(df['Predicted'] == id)]['Observations'].mean()
-                           for id in range(num_classes)])
+    accuracy_k = np.array([df[(df['Predicted'] == class_idx)]['Observations'].mean()
+                           for class_idx in range(num_classes)])
     return accuracy_k
+
+
+def _get_ece_k(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
+               num_bins=10) -> np.ndarray:
+    """
+
+    :param categories:
+    :param observations:
+    :param confidences:
+    :param num_classes:
+    :param num_bins:
+    :return:
+    """
+    ece_k = np.zeros((num_classes,))
+
+    for class_idx in range(num_classes):
+        mask_idx = [i for i in range(len(observations)) if categories[i] == class_idx]
+        observations_sublist = [observations[i] for i in mask_idx]
+        confidences_sublist = [confidences[i] for i in mask_idx]
+        ece_k[class_idx] = eval_ece(confidences_sublist, observations_sublist, num_bins)
+
+    return ece_k
 
 
 def _get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
@@ -53,10 +75,9 @@ def _get_ground_truth(categories: List[int], observations: List[bool], confidenc
     """
     if metric == 'accuracy':
         metric_val = _get_accuracy_k(categories, observations, num_classes)
-    elif metric == 'calibration_bias':
+    elif metric == 'calibration_error':
         accuracy_k = _get_accuracy_k(categories, observations, num_classes)
-        confidence_k = _get_confidence_k(categories, confidences, num_classes)
-        metric_val = confidence_k - accuracy_k
+        ece_k = _get_ece_k(categories, confidences, scores, num_classes, num_bins)
     if mode == 'max':
         return np.argwhere(metric_val == np.amax(metric_val)).flatten().tolist()
     else:
@@ -101,10 +122,7 @@ def get_samples(categories: List[int],
         # update model, deques, thetas, choices
         model.update(category, deques[category].pop())
 
-        if metric == "accuracy":
-            metric_val = model.theta
-        elif metric == 'calibration_bias':
-            metric_val = confidence_k - model.theta
+        metric_val = model.eval
         if mode == 'min':
             success[i] = (np.argmin(metric_val) in ground_truth) * 1.0
         elif mode == 'max':
@@ -248,7 +266,7 @@ if __name__ == "__main__":
 
     # for DATASET in ['cifar100', 'svhn', 'imagenet', 'imagenet2_topimages', '20newsgroup', 'dbpedia']:
     for DATASET in ['cifar100']:
-        for METRIC in ['accuracy', 'calibration_bias']:
+        for METRIC in ['accuracy', 'calibration_error']:
             for MODE in ['min', 'max']:
                 print(DATASET, METRIC, MODE, '...')
                 main(RUNS, MODE, METRIC, DATASET)

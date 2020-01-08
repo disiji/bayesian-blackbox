@@ -238,13 +238,13 @@ class ClasswiseEce(Model):
 
         if prior is None:
             self._classwise_ece_models = [
-                copy.deepcopy(SumOfBetaEce(num_bins, weight[i], prior_alpha=None, prior_beta=None))
-                for i in range(k)]
+                copy.deepcopy(SumOfBetaEce(num_bins, weight[class_idx], prior_alpha=None, prior_beta=None))
+                for class_idx in range(k)]
         else:
             self._classwise_ece_models = [
-                copy.deepcopy(SumOfBetaEce(num_bins, weight[i], prior_alpha=prior[i, :, 0].squeeze(),
-                                           prior_beta=prior[i, :, 1].squeeze()))
-                for i in range(k)]
+                copy.deepcopy(SumOfBetaEce(num_bins, weight[class_idx], prior_alpha=prior[class_idx, :, 0].squeeze(),
+                                           prior_beta=prior[class_idx, :, 1].squeeze()))
+                for class_idx in range(k)]
 
     def update(self, category: int, observation: bool, score: float):
         """
@@ -276,8 +276,24 @@ class ClasswiseEce(Model):
         =======
         An (k,) array of ECE evaluate for each class.
         """
-        classwise_ece = np.array([self._classwise_ece_models[i].eval for i in range(self._k)])
+        classwise_ece = np.array([self._classwise_ece_models[class_idx].eval for class_idx in range(self._k)])
         return classwise_ece
+
+    def sample(self, num_samples: int = 1) -> np.ndarray:
+        """Draw sample eces from the posterior.
+
+        Parameters
+        ==========
+        num_samples : int
+            Number of times to sample from posterior. Default: 1.
+
+        Returns
+        =======
+        An (k, num_samples) array of samples of theta. If num_samples == 1 then last dimension is squeezed.
+        """
+        samples = np.array(
+            [self._classwise_ece_models[class_idx].sample(num_samples) for class_idx in range(self._k)]).squeeze()
+        return samples
 
 
 class DirichletMultinomialCost(Model):
