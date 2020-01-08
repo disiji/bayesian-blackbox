@@ -87,18 +87,12 @@ def random_sampling(deques: List[deque], **kwargs) -> int:
 def thompson_sampling(deques: List[deque],
                       model: BetaBernoulli,
                       mode: str,
-                      metric: str,
-                      confidence_k: np.ndarray = None,
                       **kwargs) -> int:
-    theta_hat = model.sample()
-    if metric == 'accuracy':
-        metric_val = theta_hat
-    elif metric == 'calibration_bias':
-        metric_val = confidence_k - theta_hat
+    samples = model.sample()
     if mode == 'max':
-        ranked = np.argsort(metric_val)[::-1]
+        ranked = np.argsort(samples)[::-1]
     elif mode == 'min':
-        ranked = np.argsort(metric_val)
+        ranked = np.argsort(samples)
     for j in range(len(deques)):
         category = ranked[j]
         if len(deques[category]) != 0:
@@ -108,12 +102,11 @@ def thompson_sampling(deques: List[deque],
 def top_two_thompson_sampling(deques: List[deque],
                               model: BetaBernoulli,
                               mode: str,
-                              metric: str,
                               confidence_k: np.ndarray = None,
                               max_ttts_trial=50,
                               ttts_beta: float = 0.5,
                               **kwargs) -> int:
-    category_1 = thompson_sampling(deques, model, mode, metric, confidence_k)
+    category_1 = thompson_sampling(deques, model, mode)
     # toss a coin with probability beta
     B = np.random.binomial(1, ttts_beta)
     if B == 1:
@@ -121,7 +114,7 @@ def top_two_thompson_sampling(deques: List[deque],
     else:
         count = 0
         while True:
-            category_2 = thompson_sampling(deques, model, mode, metric, confidence_k)
+            category_2 = thompson_sampling(deques, model, mode)
             if category_2 != category_1:
                 return category_2
             else:
@@ -133,50 +126,44 @@ def top_two_thompson_sampling(deques: List[deque],
 def epsilon_greedy(deques: List[deque],
                    model: BetaBernoulli,
                    mode: str,
-                   metric: str,
-                   confidence_k: np.ndarray = None,
                    epsilon: float = 0.1,
                    **kwargs) -> int:
     if random.random() < epsilon:
         return random_sampling(deques)
     else:
-        theta_hat = model.eval
-        if metric == 'accuracy':
-            metric_val = theta_hat
-        elif metric == 'calibration_bias':
-            metric_val = confidence_k - theta_hat
+        samples = model.eval
         if mode == 'max':
-            ranked = np.argsort(metric_val)[::-1]
+            ranked = np.argsort(samples)[::-1]
         elif mode == 'min':
-            ranked = np.argsort(metric_val)
+            ranked = np.argsort(samples)
         for j in range(len(deques)):
             category = ranked[j]
             if len(deques[category]) != 0:
                 return category
 
 
-def bayesian_UCB(deques: List[deque],
-                 model: BetaBernoulli,
-                 mode: str,
-                 metric: str,
-                 confidence_k: np.ndarray = None,
-                 ucb_c: int = 1,
-                 **kwargs) -> int:
-    # get mean of metric_val
-    if metric == 'accuracy':
-        metric_val = model.eval
-    elif metric == 'calibration_bias':
-        metric_val = confidence_k - model.eval
-    if mode == 'max':
-        metric_val += ucb_c * model.get_variance()
-        ranked = np.argsort(metric_val)[::-1]
-    elif mode == 'min':
-        metric_val -= ucb_c * model.get_variance()
-        ranked = np.argsort(metric_val)
-    for j in range(len(deques)):
-        category = ranked[j]
-        if len(deques[category]) != 0:
-            return category
+#todo: implement get_variance for ece models
+# def bayesian_UCB(deques: List[deque],
+#                  model: BetaBernoulli,
+#                  mode: str,
+#                  confidence_k: np.ndarray = None,
+#                  ucb_c: int = 1,
+#                  **kwargs) -> int:
+#     # get mean of metric_val
+#     if metric == 'accuracy':
+#         metric_val = model.eval
+#     elif metric == 'calibration_bias':
+#         metric_val = confidence_k - model.eval
+#     if mode == 'max':
+#         metric_val += ucb_c * model.get_variance()
+#         ranked = np.argsort(metric_val)[::-1]
+#     elif mode == 'min':
+#         metric_val -= ucb_c * model.get_variance()
+#         ranked = np.argsort(metric_val)
+#     for j in range(len(deques)):
+#         category = ranked[j]
+#         if len(deques[category]) != 0:
+#             return category
 
 
 SAMPLE_CATEGORY = {
@@ -184,5 +171,5 @@ SAMPLE_CATEGORY = {
     'ts': thompson_sampling,
     'ttts': top_two_thompson_sampling,
     'epsilon_greedy': epsilon_greedy,
-    'bayesian_ucb': bayesian_UCB
+    # 'bayesian_ucb': bayesian_UCB
 }

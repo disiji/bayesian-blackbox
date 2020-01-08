@@ -82,7 +82,7 @@ class BetaBernoulli(Model):
             else:
                 self._params[category, 1] += 1
 
-    def sample(self, num_samples) -> np.ndarray:
+    def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample thetas from the posterior.
 
         Parameters
