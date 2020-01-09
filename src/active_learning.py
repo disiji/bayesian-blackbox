@@ -258,11 +258,11 @@ def main_accuracy(RUNS, MODE, DATASET):
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'accuracy', MODE, method, RUNS)
+        output_name = "../output/active_learning/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'acc', MODE, method, RUNS)
         pickle.dump(success_rate_dict[method], open(output_name, "wb"))
 
     # evaluation
-    figname = "../output/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, 'accurayc', MODE, RUNS)
+    figname = "../output/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, 'acc', MODE, RUNS)
     comparison_plot(success_rate_dict, figname)
 
 
@@ -354,7 +354,8 @@ if __name__ == "__main__":
 
     RUNS = 100
 
-    dataset = str(sys.argv[1])
+    # dataset = str(sys.argv[1])
+    dataset = 'cifar100'
     if dataset not in DATASET_LIST:
         raise ValueError("%s is not in DATASET_LIST." % dataset)
 
