@@ -7,8 +7,7 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
-from active_utils import prepare_data, SAMPLE_CATEGORY, eval_ece
+from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, _get_ground_truth
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 
@@ -17,71 +16,6 @@ TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
-
-
-def _get_confidence_k(categories: List[int], confidences: List[float], num_classes: int) -> np.ndarray:
-    """
-
-    :param categories:
-    :param confidences:
-    :param num_classes:
-    :return: confidence_k: (num_classes, )
-    """
-    df = pd.DataFrame(list(zip(categories, confidences)), columns=['Predicted', 'Confidence'])
-    confidence_k = np.array([df[(df['Predicted'] == id)]['Confidence'].mean()
-                             for id in range(num_classes)])
-    return confidence_k
-
-
-def _get_accuracy_k(categories: List[int], observations: List[bool], num_classes: int) -> np.ndarray:
-    observations = np.array(observations) * 1.0
-    df = pd.DataFrame(list(zip(categories, observations)), columns=['Predicted', 'Observations'])
-    accuracy_k = np.array([df[(df['Predicted'] == class_idx)]['Observations'].mean()
-                           for class_idx in range(num_classes)])
-    return accuracy_k
-
-
-def _get_ece_k(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
-               num_bins=10) -> np.ndarray:
-    """
-
-    :param categories:
-    :param observations:
-    :param confidences:
-    :param num_classes:
-    :param num_bins:
-    :return:
-    """
-    ece_k = np.zeros((num_classes,))
-
-    for class_idx in range(num_classes):
-        mask_idx = [i for i in range(len(observations)) if categories[i] == class_idx]
-        observations_sublist = [observations[i] for i in mask_idx]
-        confidences_sublist = [confidences[i] for i in mask_idx]
-        ece_k[class_idx] = eval_ece(confidences_sublist, observations_sublist, num_bins)
-
-    return ece_k
-
-
-def _get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
-                      metric: str, mode: str) -> int:
-    """
-    Compute ground truth given metric and mode with all data points.
-    :param categories:
-    :param observations:
-    :param confidences:
-    :param metric:
-    :param mode:
-    :return:
-    """
-    if metric == 'accuracy':
-        metric_val = _get_accuracy_k(categories, observations, num_classes)
-    elif metric == 'calibration_error':
-        metric_val = _get_ece_k(categories, observations, confidences, num_classes, num_bins=10)
-    if mode == 'max':
-        return np.argwhere(metric_val == np.amax(metric_val)).flatten().tolist()
-    else:
-        return np.argwhere(metric_val == np.amin(metric_val)).flatten().tolist()
 
 
 def get_samples(categories: List[int],
@@ -352,7 +286,7 @@ def main_calibration_error(RUNS, MODE, DATASET):
 
 if __name__ == "__main__":
 
-    RUNS = 100
+    RUNS = 10
 
     # dataset = str(sys.argv[1])
     dataset = 'cifar100'

@@ -3,6 +3,7 @@ from collections import deque
 from typing import List
 
 import numpy as np
+import pandas as pd
 from models import BetaBernoulli
 
 
@@ -77,33 +78,124 @@ def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
     return ece
 
 
-def random_sampling(deques: List[deque], **kwargs) -> int:
+def _get_confidence_k(categories: List[int], confidences: List[float], num_classes: int) -> np.ndarray:
+    """
+
+    :param categories:
+    :param confidences:
+    :param num_classes:
+    :return: confidence_k: (num_classes, )
+    """
+    df = pd.DataFrame(list(zip(categories, confidences)), columns=['Predicted', 'Confidence'])
+    confidence_k = np.array([df[(df['Predicted'] == id)]['Confidence'].mean()
+                             for id in range(num_classes)])
+    return confidence_k
+
+
+def _get_accuracy_k(categories: List[int], observations: List[bool], num_classes: int) -> np.ndarray:
+    observations = np.array(observations) * 1.0
+    df = pd.DataFrame(list(zip(categories, observations)), columns=['Predicted', 'Observations'])
+    accuracy_k = np.array([df[(df['Predicted'] == class_idx)]['Observations'].mean()
+                           for class_idx in range(num_classes)])
+    return accuracy_k
+
+
+def _get_ece_k(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
+               num_bins=10) -> np.ndarray:
+    """
+
+    :param categories:
+    :param observations:
+    :param confidences:
+    :param num_classes:
+    :param num_bins:
+    :return:
+    """
+    ece_k = np.zeros((num_classes,))
+
+    for class_idx in range(num_classes):
+        mask_idx = [i for i in range(len(observations)) if categories[i] == class_idx]
+        observations_sublist = [observations[i] for i in mask_idx]
+        confidences_sublist = [confidences[i] for i in mask_idx]
+        ece_k[class_idx] = eval_ece(confidences_sublist, observations_sublist, num_bins)
+
+    return ece_k
+
+
+def _get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
+                      metric: str, mode: str, topk: int = 1) -> int:
+    """
+    Compute ground truth given metric and mode with all data points.
+    :param categories:
+    :param observations:
+    :param confidences:
+    :param metric:
+    :param mode:
+    :return:
+    """
+    if metric == 'accuracy':
+        metric_val = _get_accuracy_k(categories, observations, num_classes)
+    elif metric == 'calibration_error':
+        metric_val = _get_ece_k(categories, observations, confidences, num_classes, num_bins=10)
+    if mode == 'max':
+        return metric_val.argsort()[-topk:][::-1].flatten().tolist()
+    else:
+        return metric_val.argsort()[:topk].flatten().tolist()
+
+
+def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
     while True:
         # select each class randomly
-        category = random.randrange(len(deques))
-        if len(deques[category]) != 0:
-            return category
+        if topk == 1:
+            category = random.randrange(len(deques))
+            if len(deques[category]) != 0:
+                return category
+        else:
+            # return a list of randomly selected categories:
+            candidates = set([i for i in range(len(deques)) if len(deques[i]) > 0])
+            if len(candidates) >= topk:
+                return random.sample(candidates, topk)
+            else: # there are less than topk available arms to play
+                categories_list = []
+                for idx in range(topk):
+                    counts = [len(deques[i]) for i in candidates]
+                    category = random.randrange(len(deques))
+                    categories_list.append(category)
+                    counts[category] -= 1
+                    if counts[category] == 0:
+                        candidates.remove(category)
+                    return categories_list
 
 
 def thompson_sampling(deques: List[deque],
                       model: BetaBernoulli,
                       mode: str,
+                      topk:int=1,
                       **kwargs) -> int:
     samples = model.sample()
     if mode == 'max':
         ranked = np.argsort(samples)[::-1]
     elif mode == 'min':
         ranked = np.argsort(samples)
-    for j in range(len(deques)):
-        category = ranked[j]
-        if len(deques[category]) != 0:
-            return category
+    if topk == 1:
+        for category in ranked:
+            if len(deques[category]) != 0:
+                return category
+    else:
+        categories_list = []
+        counts = [len(deques[i]) for i in range(len(deques))]
+        # todo: when we go through 'ranked' and len(categories_list) < topk
+        for category in ranked:
+            if counts[category] != 0:
+                categories_list.append(category)
+                counts[category] -= 1
+                if len(categories_list) == topk:
+                    return categories_list
 
 
 def top_two_thompson_sampling(deques: List[deque],
                               model: BetaBernoulli,
                               mode: str,
-                              confidence_k: np.ndarray = None,
                               max_ttts_trial=50,
                               ttts_beta: float = 0.5,
                               **kwargs) -> int:
