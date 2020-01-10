@@ -30,6 +30,7 @@ def get_samples_topk(categories: List[int],
                      weight=None,
                      random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray]:
     # prepare model, deques, thetas, choices
+
     random.seed(random_seed)
 
     if metric == 'accuracy':
@@ -49,6 +50,7 @@ def get_samples_topk(categories: List[int],
     ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode, topk=topk)
 
     avg_num_agreement = copy.deepcopy(np.zeros((num_samples,)))
+
     for i in range(num_samples // topk):
         categories_list = SAMPLE_CATEGORY[sample_method].__call__(deques=deques,
                                                                   random_seed=random_seed,
@@ -60,19 +62,19 @@ def get_samples_topk(categories: List[int],
                                                                   epsilon=0.1,
                                                                   ucb_c=1, )
         # update model, deques, thetas, choices
-        for category in categories_list:
+        for idx, category in enumerate(categories_list):
             if metric == 'accuracy':
                 model.update(category, deques[category].pop())
             elif metric == 'calibration_error':
                 observation, score = deques[category].pop()
                 model.update(category, observation, score)
 
-        metric_val = model.eval
-        if mode == 'min':
-            topk_arms = set(metric_val.argsort()[:topk].flatten().tolist())
-        elif mode == 'max':
-            topk_arms = set(metric_val.argsort()[-topk:][::-1].flatten().tolist())
-        avg_num_agreement[i] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / topk
+            metric_val = model.eval
+            if mode == 'min':
+                topk_arms = set(metric_val.argsort()[:topk].flatten().tolist())
+            elif mode == 'max':
+                topk_arms = set(metric_val.argsort()[-topk:][::-1].flatten().tolist())
+            avg_num_agreement[i * topk + idx] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / topk
 
     return avg_num_agreement
 
@@ -91,7 +93,7 @@ def comparison_plot(success_rate_dict, figname) -> None:
     plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
 
 
-def main_accuracy_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
+def main_accuracy_topk_two_stage(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
     datafile = datafile_dict[DATASET]
     NUM_CLASSES = num_classes_dict[DATASET]
 
@@ -150,64 +152,66 @@ def main_accuracy_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning_topk/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'acc', MODE, method, RUNS)
+        output_name = "../output/active_learning_topk/%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+            DATASET, 'acc', MODE, method, RUNS, topk)
         pickle.dump(success_rate_dict[method], open(output_name, "wb"))
 
     # evaluation
-    figname = "../output/active_learning_topk/%s_%s_%s_runs_%d.pdf" % (DATASET, 'acc', MODE, RUNS)
+    figname = "../output/active_learning_topk/%s_%s_%s_runs_%d_topk_%d.pdf" % (DATASET, 'acc', MODE, RUNS, topk)
     comparison_plot(success_rate_dict, figname)
 
 
-def main_calibration_error_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
-    datafile = datafile_dict[DATASET]
-    NUM_CLASSES = num_classes_dict[DATASET]
-
-    categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, False)
-    N = len(observations)
-
-    success_rate_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts': copy.deepcopy(np.zeros((N,))),
-    }
-    for r in range(RUNS):
-        print(r, 'random')
-        success_rate_dict['random'] += get_samples_topk(categories,
-                                                        observations,
-                                                        confidences,
-                                                        NUM_CLASSES,
-                                                        N,
-                                                        sample_method='random',
-                                                        mode=MODE,
-                                                        metric='calibration_error',
-                                                        topk=topk,
-                                                        prior=None,
-                                                        random_seed=r)
-        print(r, 'ts')
-        success_rate_dict['ts'] += get_samples_topk(categories,
-                                                    observations,
-                                                    confidences,
-                                                    NUM_CLASSES,
-                                                    N,
-                                                    sample_method='ts',
-                                                    mode=MODE,
-                                                    metric='calibration_error',
-                                                    topk=topk,
-                                                    prior=None,
-                                                    random_seed=r)
-
-    for method in success_rate_dict:
-        success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning_topk/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'ece', MODE, method, RUNS)
-        pickle.dump(success_rate_dict[method], open(output_name, "wb"))
-
-    # evaluation
-    figname = "../output/active_learning_topk/%s_%s_%s_runs_%d.pdf" % (DATASET, 'ece', MODE, RUNS)
-    comparison_plot(success_rate_dict, figname)
+# todo: calibration topk experiments
+# def main_calibration_error_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
+#     datafile = datafile_dict[DATASET]
+#     NUM_CLASSES = num_classes_dict[DATASET]
+#
+#     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, False)
+#     N = len(observations)
+#
+#     success_rate_dict = {
+#         'random': copy.deepcopy(np.zeros((N,))),
+#         'ts': copy.deepcopy(np.zeros((N,))),
+#     }
+#     for r in range(RUNS):
+#         print(r, 'random')
+#         success_rate_dict['random'] += get_samples_topk(categories,
+#                                                         observations,
+#                                                         confidences,
+#                                                         NUM_CLASSES,
+#                                                         N,
+#                                                         sample_method='random',
+#                                                         mode=MODE,
+#                                                         metric='calibration_error',
+#                                                         topk=topk,
+#                                                         prior=None,
+#                                                         random_seed=r)
+#         print(r, 'ts')
+#         success_rate_dict['ts'] += get_samples_topk(categories,
+#                                                     observations,
+#                                                     confidences,
+#                                                     NUM_CLASSES,
+#                                                     N,
+#                                                     sample_method='ts',
+#                                                     mode=MODE,
+#                                                     metric='calibration_error',
+#                                                     topk=topk,
+#                                                     prior=None,
+#                                                     random_seed=r)
+#
+#     for method in success_rate_dict:
+#         success_rate_dict[method] /= RUNS
+#         output_name = "../output/active_learning_topk/%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (DATASET, 'ece', MODE, method, RUNS, topk)
+#         pickle.dump(success_rate_dict[method], open(output_name, "wb"))
+#
+#     # evaluation
+#     figname = "../output/active_learning_topk/%s_%s_%s_runs_%d_topk_%d.pdf" % (DATASET, 'ece', MODE, RUNS, topk)
+#     comparison_plot(success_rate_dict, figname)
 
 
 if __name__ == "__main__":
 
-    RUNS = 100
+    RUNS = 10
     TOP_K = 2
 
     # dataset = str(sys.argv[1])
@@ -217,5 +221,5 @@ if __name__ == "__main__":
 
     for MODE in ['min', 'max']:
         print(dataset, MODE, '...')
-        main_accuracy_topk(RUNS, MODE, dataset, topk=TOP_K)
-        main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K)
+        main_accuracy_topk_two_stage(RUNS, MODE, dataset, topk=TOP_K)
+        # main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K)
