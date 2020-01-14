@@ -155,7 +155,7 @@ def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
             candidates = set([i for i in range(len(deques)) if len(deques[i]) > 0])
             if len(candidates) >= topk:
                 return random.sample(candidates, topk)
-            else: # there are less than topk available arms to play
+            else:  # there are less than topk available arms to play
                 categories_list = []
                 for idx in range(topk):
                     counts = [len(deques[i]) for i in candidates]
@@ -170,7 +170,7 @@ def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
 def thompson_sampling(deques: List[deque],
                       model: BetaBernoulli,
                       mode: str,
-                      topk:int=1,
+                      topk: int = 1,
                       **kwargs) -> int:
     samples = model.sample()
     if mode == 'max':
@@ -184,13 +184,15 @@ def thompson_sampling(deques: List[deque],
     else:
         categories_list = []
         counts = [len(deques[i]) for i in range(len(deques))]
-        # todo: when we go through 'ranked' and len(categories_list) < topk
+
         for category in ranked:
             if counts[category] != 0:
                 categories_list.append(category)
                 counts[category] -= 1
                 if len(categories_list) == topk:
                     return categories_list
+        # when we go through 'ranked' and len(categories_list) < topk, topk sampling is reduced to top 1
+        return thompson_sampling(deques, model, mode, topk=1)
 
 
 def top_two_thompson_sampling(deques: List[deque],
