@@ -156,15 +156,7 @@ def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
             if len(candidates) >= topk:
                 return random.sample(candidates, topk)
             else:  # there are less than topk available arms to play
-                categories_list = []
-                for idx in range(topk):
-                    counts = [len(deques[i]) for i in candidates]
-                    category = random.randrange(len(deques))
-                    categories_list.append(category)
-                    counts[category] -= 1
-                    if counts[category] == 0:
-                        candidates.remove(category)
-                    return categories_list
+                return random_sampling(deques, topk=1)
 
 
 def thompson_sampling(deques: List[deque],
@@ -183,16 +175,16 @@ def thompson_sampling(deques: List[deque],
                 return category
     else:
         categories_list = []
-        counts = [len(deques[i]) for i in range(len(deques))]
-
-        for category in ranked:
-            if counts[category] != 0:
-                categories_list.append(category)
-                counts[category] -= 1
-                if len(categories_list) == topk:
-                    return categories_list
+        candidates = set([i for i in range(len(deques)) if len(deques[i]) > 0])
         # when we go through 'ranked' and len(categories_list) < topk, topk sampling is reduced to top 1
-        return thompson_sampling(deques, model, mode, topk=1)
+        if len(candidates) < topk:
+            return thompson_sampling(deques, model, mode, topk=1)
+        else:
+            for category in ranked:
+                if category in candidates:
+                    categories_list.append(category)
+                    if len(categories_list) == topk:
+                        return categories_list
 
 
 def top_two_thompson_sampling(deques: List[deque],

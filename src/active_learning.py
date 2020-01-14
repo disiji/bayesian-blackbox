@@ -111,7 +111,7 @@ def main_accuracy(RUNS, MODE, DATASET):
         'epsilon_greedy': copy.deepcopy(np.zeros((N,))),
         'bayesian_ucb': copy.deepcopy(np.zeros((N,))),
     }
-    for r in range(RUNS):
+    for r in tqdm(range(RUNS)):
         print(r, 'random')
         success_rate_dict['random'] += get_samples(categories,
                                                    observations,

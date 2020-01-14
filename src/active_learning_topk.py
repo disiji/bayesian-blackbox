@@ -68,17 +68,25 @@ def get_samples_topk(categories: List[int],
     for _deque in deques:
         random.shuffle(_deque)
 
-    ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode, topk=topk)
+    ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode, topk=TOPK)
 
-    avg_num_agreement = []
-    cumulative_metric = []
-    non_cumulative_metric = []
+    avg_num_agreement = [None] * num_samples
+    cumulative_metric = [None] * num_samples
+    non_cumulative_metric = [None] * num_samples
 
-    sampled_categories = []
-    sampled_scores = []
-    sampled_observations = []
+    sampled_categories = [None] * num_samples
+    sampled_scores = [None] * num_samples
+    sampled_observations = [None] * num_samples
 
-    while (len(sampled_categories) < num_samples):
+    idx = 0
+
+    while (idx < num_samples):
+
+        if idx % (num_samples // 10) == 0:
+            print (idx, '...')
+        # sampling process:
+        # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
+        # then the return 'category_list' is an int
         categories_list = SAMPLE_CATEGORY[sample_method].__call__(deques=deques,
                                                                   random_seed=random_seed,
                                                                   model=model,
@@ -88,13 +96,12 @@ def get_samples_topk(categories: List[int],
                                                                   ttts_beta=0.5,
                                                                   epsilon=0.1,
                                                                   ucb_c=1, )
-        # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1, then the return 'category_list' is an int
         if type(categories_list) != list:
             categories_list = [categories_list]
             topk = 1
 
         # update model, deques, thetas, choices
-        for idx, category in enumerate(categories_list):
+        for category in categories_list:
             if metric == 'accuracy':
                 observation = deques[category].pop()
                 model.update(category, observation)
@@ -102,10 +109,10 @@ def get_samples_topk(categories: List[int],
             elif metric == 'calibration_error':
                 observation, score = deques[category].pop()
                 model.update(category, observation, score)
-                sampled_scores.append(score)
+                sampled_scores[idx] = score
 
-            sampled_categories.append(category)
-            sampled_observations.append(observation)
+            sampled_categories[idx] = category
+            sampled_observations[idx] = observation
 
             # select TOPK arms
             metric_val = model.eval
@@ -115,23 +122,20 @@ def get_samples_topk(categories: List[int],
                 topk_arms = metric_val.argsort()[-TOPK:][::-1].flatten().tolist()
 
             # evaluation
-            avg_num_agreement.append(len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / TOPK)
+            avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / TOPK
             if metric == 'accuracy':
-                cumulative_metric.append(_get_accuracy_k(sampled_categories, sampled_observations, num_classes).mean())
+                cumulative_metric[idx] = _get_accuracy_k(sampled_categories[:idx + 1], sampled_observations[:idx + 1],
+                                                         num_classes).mean()
             elif metric == 'calibration_error':
-                cumulative_metric.append(
-                    _get_ece_k(sampled_categories, sampled_observations, sampled_scores, num_classes,
-                               num_bins=10).mean())
+                cumulative_metric[idx] = _get_ece_k(sampled_categories[:idx + 1], sampled_observations[:idx + 1],
+                                                    sampled_scores[:idx + 1], num_classes, num_bins=10).mean()
+            non_cumulative_metric[idx] = metric_val[topk_arms].mean()
 
-            non_cumulative_metric.append(metric_val[topk_arms].mean())
+            idx += 1
 
-    avg_num_agreement = np.array(avg_num_agreement)
-    cumulative_metric = np.array(cumulative_metric)
-    non_cumulative_metric = np.array(non_cumulative_metric)
-
-    return {'avg_num_agreement': avg_num_agreement,
-            'cumulative_metric': cumulative_metric,
-            'non_cumulative_metric': non_cumulative_metric}
+    return {'avg_num_agreement': np.array(avg_num_agreement),
+            'cumulative_metric': np.array(cumulative_metric),
+            'non_cumulative_metric': np.array(non_cumulative_metric)}
 
 
 def comparison_plot(success_rate_dict, figname, ylabel) -> None:
@@ -153,12 +157,12 @@ def main_accuracy_topk_two_stage(RUNS: int, MODE: str, DATASET: str, topk=1) -> 
     NUM_CLASSES = num_classes_dict[DATASET]
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, False)
-    N = len(observations) // 2
+    N = len(observations) // 10
 
     UNIFORM_PRIOR = np.ones((NUM_CLASSES, 2)) / 2
 
     confidence = _get_confidence_k(categories, confidences, NUM_CLASSES)
-    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * 10
+    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T
 
     # get samples for multiple runs
     # returns one thing: success or not
@@ -209,6 +213,7 @@ def main_accuracy_topk_two_stage(RUNS: int, MODE: str, DATASET: str, topk=1) -> 
         avg_num_agreement_dict['ts_uniform'] += output['avg_num_agreement']
         cumulative_metric_dict['ts_uniform'] += output['cumulative_metric']
         non_cumulative_metric_dict['ts_uniform'] += output['non_cumulative_metric']
+
         print(r, 'ts_informed')
         output = get_samples_topk(categories,
                                   observations,
@@ -226,30 +231,33 @@ def main_accuracy_topk_two_stage(RUNS: int, MODE: str, DATASET: str, topk=1) -> 
         non_cumulative_metric_dict['ts_informed'] += output['non_cumulative_metric']
 
     for method in ['random', 'ts_uniform', 'ts_informed']:
-        output_name = "../output/active_learning_topk/avg_num_agreement_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
-            DATASET, 'acc', MODE, method, RUNS, topk)
-        pickle.dump(avg_num_agreement_dict[method], open(output_name, "wb"))
+        pickle.dump(avg_num_agreement_dict[method],
+                    open("../output/active_learning_topk/avg_num_agreement_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'acc', MODE, method, RUNS, topk), "wb"))
 
-        output_name = "../output/active_learning_topk/cumulative_metric_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
-            DATASET, 'acc', MODE, method, RUNS, topk)
-        pickle.dump(cumulative_metric_dict[method], open(output_name, "wb"))
+        pickle.dump(cumulative_metric_dict[method],
+                    open("../output/active_learning_topk/cumulative_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'acc', MODE, method, RUNS, topk), "wb"))
 
-        output_name = "../output/active_learning_topk/non_cumulative_metric_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
-            DATASET, 'acc', MODE, method, RUNS, topk)
-        pickle.dump(non_cumulative_metric_dict[method], open(output_name, "wb"))
+        pickle.dump(non_cumulative_metric_dict[method],
+                    open("../output/active_learning_topk/non_cumulative_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'acc', MODE, method, RUNS, topk), "wb"))
 
     # evaluation
-    figname = "../output/active_learning_topk/avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
-        DATASET, 'acc', MODE, RUNS, topk)
-    comparison_plot(avg_num_agreement_dict, figname, 'Avg number of agreement')
+    comparison_plot(avg_num_agreement_dict,
+                    "../output/active_learning_topk/avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'acc', MODE, RUNS, topk),
+                    'Avg number of agreement')
 
-    figname = "../output/active_learning_topk/cumulative_metric_%s_%s_%s_runs_%d_topk_%d.pdf" % (
-        DATASET, 'acc', MODE, RUNS, topk)
-    comparison_plot(cumulative_metric_dict, figname, 'Cummlative accuracy')
+    comparison_plot(cumulative_metric_dict,
+                    "../output/active_learning_topk/cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'acc', MODE, RUNS, topk),
+                    'Cummlative accuracy')
 
-    figname = "../output/active_learning_topk/non_cumulative_metric_%s_%s_%s_runs_%d_topk_%d.pdf" % (
-        DATASET, 'acc', MODE, RUNS, topk)
-    comparison_plot(non_cumulative_metric_dict, figname, 'Non cumulative accuracy')
+    comparison_plot(non_cumulative_metric_dict,
+                    "../output/active_learning_topk/non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'acc', MODE, RUNS, topk),
+                    'Non cumulative accuracy')
 
 
 # todo: calibration topk experiments
@@ -258,47 +266,82 @@ def main_calibration_error_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> N
     NUM_CLASSES = num_classes_dict[DATASET]
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile, False)
-    N = len(observations)
+    N = len(observations) // 10
 
-    success_rate_dict = {
+    avg_num_agreement_dict = {
         'random': copy.deepcopy(np.zeros((N,))),
         'ts': copy.deepcopy(np.zeros((N,))),
     }
+    cumulative_metric_dict = {
+        'random': copy.deepcopy(np.zeros((N,))),
+        'ts': copy.deepcopy(np.zeros((N,))),
+    }
+    non_cumulative_metric_dict = {
+        'random': copy.deepcopy(np.zeros((N,))),
+        'ts': copy.deepcopy(np.zeros((N,))),
+    }
+
     for r in range(RUNS):
         print(r, 'random')
-        success_rate_dict['random'] += get_samples_topk(categories,
-                                                        observations,
-                                                        confidences,
-                                                        NUM_CLASSES,
-                                                        N,
-                                                        sample_method='random',
-                                                        mode=MODE,
-                                                        metric='calibration_error',
-                                                        topk=topk,
-                                                        prior=None,
-                                                        random_seed=r)
-        print(r, 'ts')
-        success_rate_dict['ts'] += get_samples_topk(categories,
-                                                    observations,
-                                                    confidences,
-                                                    NUM_CLASSES,
-                                                    N,
-                                                    sample_method='ts',
-                                                    mode=MODE,
-                                                    metric='calibration_error',
-                                                    topk=topk,
-                                                    prior=None,
-                                                    random_seed=r)
+        output = get_samples_topk(categories,
+                                  observations,
+                                  confidences,
+                                  NUM_CLASSES,
+                                  N,
+                                  sample_method='random',
+                                  mode=MODE,
+                                  metric='calibration_error',
+                                  topk=topk,
+                                  prior=None,
+                                  random_seed=r)
+        avg_num_agreement_dict['random'] += output['avg_num_agreement']
+        cumulative_metric_dict['random'] += output['cumulative_metric']
+        non_cumulative_metric_dict['random'] += output['non_cumulative_metric']
 
-    for method in success_rate_dict:
-        success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning_topk/%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
-            DATASET, 'ece', MODE, method, RUNS, topk)
-        pickle.dump(success_rate_dict[method], open(output_name, "wb"))
+        print(r, 'ts')
+        output = get_samples_topk(categories,
+                                  observations,
+                                  confidences,
+                                  NUM_CLASSES,
+                                  N,
+                                  sample_method='ts',
+                                  mode=MODE,
+                                  metric='calibration_error',
+                                  topk=topk,
+                                  prior=None,
+                                  random_seed=r)
+        avg_num_agreement_dict['ts'] += output['avg_num_agreement']
+        cumulative_metric_dict['ts'] += output['cumulative_metric']
+        non_cumulative_metric_dict['ts'] += output['non_cumulative_metric']
+
+    for method in ['random', 'ts']:
+        pickle.dump(avg_num_agreement_dict[method],
+                    open("../output/active_learning_topk/avg_num_agreement_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'ece', MODE, method, RUNS, topk), "wb"))
+
+        pickle.dump(cumulative_metric_dict[method],
+                    open("../output/active_learning_topk/cumulative_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'ece', MODE, method, RUNS, topk), "wb"))
+
+        pickle.dump(non_cumulative_metric_dict[method],
+                    open("../output/active_learning_topk/non_cumulative_%s_%s_%s_%s_runs_%d_topk_%d.pkl" % (
+                        DATASET, 'ece', MODE, method, RUNS, topk), "wb"))
 
     # evaluation
-    figname = "../output/active_learning_topk/%s_%s_%s_runs_%d_topk_%d.pdf" % (DATASET, 'ece', MODE, RUNS, topk)
-    comparison_plot(success_rate_dict, figname)
+    comparison_plot(avg_num_agreement_dict,
+                    "../output/active_learning_topk/avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'ece', MODE, RUNS, topk),
+                    'Avg number of agreement')
+
+    comparison_plot(cumulative_metric_dict,
+                    "../output/active_learning_topk/cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'ece', MODE, RUNS, topk),
+                    'Cummlative ECE')
+
+    comparison_plot(non_cumulative_metric_dict,
+                    "../output/active_learning_topk/non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                        DATASET, 'ece', MODE, RUNS, topk),
+                    'Non cumulative ECE')
 
 
 if __name__ == "__main__":
