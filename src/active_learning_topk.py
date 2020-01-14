@@ -260,7 +260,6 @@ def main_accuracy_topk_two_stage(RUNS: int, MODE: str, DATASET: str, topk=1) -> 
                     'Non cumulative accuracy')
 
 
-# todo: calibration topk experiments
 def main_calibration_error_topk(RUNS: int, MODE: str, DATASET: str, topk=1) -> None:
     datafile = datafile_dict[DATASET]
     NUM_CLASSES = num_classes_dict[DATASET]
