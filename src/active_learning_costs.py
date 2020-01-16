@@ -7,6 +7,7 @@ from typing import Callable, Deque, Dict, Iterable, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from cifar100meta import superclass_lookup
+from data_utils import datafile_dict
 from models import DirichletMultinomialCost, Model
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
@@ -174,6 +175,7 @@ def max_choice_fn(sample: np.ndarray) -> np.ndarray:
 
 def select_and_label(dataset: Dataset,
                      model: Model,
+                     topk: int,
                      choice_fn: Callable) -> None:  # IDK what return type should be...
     """
     Selects data points from dataset according to criterion and updates the model.
@@ -201,17 +203,20 @@ def select_and_label(dataset: Dataset,
     for i in range(n_samples):
         sample = model.sample()
         choices = choice_fn(sample)
-        for choice in choices:
-            if queues[choice]:
-                observation = queues[choice].pop()
-                break
-            else:
-                observation = None
-        model.update(choice, observation)
 
-        if not i % LOG_FREQ:
-            index = i // LOG_FREQ - 1
-            mpe[index] = model.mpe()
+        candidates = [choice for choice in choices if len(queues[choice]) > 0]
+        if len(candidates) < topk:
+            topk = 1
+
+        for idx in range(topk):
+            choice = candidates[idx]
+            observation = queues[choice].pop()
+            model.update(choice, observation)
+
+            i += 1
+            if not i % LOG_FREQ:
+                index = i // LOG_FREQ - 1
+                mpe[index] = model.mpe()
 
     # In case we're one short
     mpe[-1] = model.mpe()
@@ -225,6 +230,26 @@ def pretty_print(arr):
         print(out)
 
 
+def eval(results: np.ndarray, highest_cost_classses: list, topk: int) -> Dict[str, np.ndarray]:
+    """
+
+    :param results:(num_runs, num_samples // LOG_FREQ, num_classes)
+    :param highest_cost_classses: list of integers of length topk. Ground truth of topk classes.
+    :param topk:
+    :return:
+    """
+    assert len(highest_cost_classses) == topk
+    avg_num_agreement = [None] * results.shape[1]
+
+    for idx in range(results.shape[0]):
+        topk_arms = (results[:, idx, :]).squeeze().argsort(axis=-1)[:, -topk:].flatten().tolist()
+        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in highest_cost_classses]) * 1.0 / (
+                topk * results.shape[0])
+    return {
+        'avg_num_agreement': avg_num_agreement,
+    }
+
+
 # 01 loss
 # Informative priors...avg predicted confidences by predicted class
 def main(args: argparse.Namespace) -> None:
@@ -236,9 +261,9 @@ def main(args: argparse.Namespace) -> None:
 
     # Load the dataset and cost matrix
     if args.superclass:
-        dataset = SuperclassDataset.load_from_text(args.input, superclass_lookup)
+        dataset = SuperclassDataset.load_from_text(datafile_dict[args.dataset], superclass_lookup)
     else:
-        dataset = Dataset.load_from_text(args.input)
+        dataset = Dataset.load_from_text(datafile_dict[args.dataset])
 
     if args.cost_matrix is None:
         if args.superclass:
@@ -257,9 +282,9 @@ def main(args: argparse.Namespace) -> None:
 
     # Determine the highest cost predicted class
     expected_costs = (dataset.confusion_probs * costs).sum(axis=-1)
-    highest_cost_class = np.argmax(expected_costs)
+    highest_cost_classes = expected_costs.argsort()[-args.topk:][::-1].flatten().tolist()
     cost_string = '\n'.join('%i  %0.4f' % x for x in enumerate(expected_costs))
-    logging.info('Highest expected cost predicted class: %i', highest_cost_class)
+    logging.info('TopK highest expected cost predicted class: %i', *highest_cost_classes)
     logging.info('Classwise expected costs:\n%s', cost_string)
 
     pretty_print(dataset.confusion_prior)
@@ -267,6 +292,7 @@ def main(args: argparse.Namespace) -> None:
     pretty_print(dataset.confusion_probs)
 
     # Run experiments...
+    # stores MPE of classwise cost after every LOG_FREQ steps for each run...
     random_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
     active_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
     active_informed_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
@@ -276,11 +302,13 @@ def main(args: argparse.Namespace) -> None:
     else:
         pseudocount = dataset.num_classes
 
+    # Sampling...
     for i in tqdm(range(N_SIMULATIONS)):
         alphas = np.ones((dataset.num_classes, pseudocount))
         model = DirichletMultinomialCost(alphas, costs)
         random_results[i] = select_and_label(dataset=dataset,
                                              model=model,
+                                             topk=args.topk,
                                              choice_fn=random_choice_fn)
         model.mpe()
 
@@ -288,24 +316,28 @@ def main(args: argparse.Namespace) -> None:
         model = DirichletMultinomialCost(alphas, costs)
         active_results[i] = select_and_label(dataset=dataset,
                                              model=model,
+                                             topk=args.topk,
                                              choice_fn=max_choice_fn)
 
         model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
         active_informed_results[i] = select_and_label(dataset=dataset,
                                                       model=model,
+                                                      topk=args.topk,
                                                       choice_fn=max_choice_fn)
 
-    random_success = (np.argmax(random_results, axis=-1) == highest_cost_class).mean(axis=0)
-    active_success = (np.argmax(active_results, axis=-1) == highest_cost_class).mean(axis=0)
-    active_informed_success = (np.argmax(active_informed_results, axis=-1) == highest_cost_class).mean(axis=0)
+    # Evaluation...
+    random_success = eval(random_results, highest_cost_classes, args.topk)['avg_num_agreement']
+    active_success = eval(active_results, highest_cost_classes, args.topk)['avg_num_agreement']
+    active_informed_success = eval(active_informed_results, highest_cost_classes, args.topk)['avg_num_agreement']
 
+    # Plot..
     fig, axes = plt.subplots(1, 1)
     x_axis = np.arange(len(random_success)) * LOG_FREQ
     axes.plot(x_axis, random_success, label='random')
     axes.plot(x_axis, active_success, label='active (uniform prior)')
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
-    plt.savefig(args.output / 'success_curve.png')
+    plt.savefig(args.output / 'success_curve_topk_%d.png' % args.topk)
 
     fig, axes = plt.subplots(1, 1)
     n_samples = 1000
@@ -315,13 +347,14 @@ def main(args: argparse.Namespace) -> None:
     for i in range(dataset.num_classes):
         hist[i] = (max_expected_costs == i).sum() / n_samples
     axes.bar(np.arange(dataset.num_classes), hist)
-    fig.savefig(args.output / 'posterior_costs.png')
+    fig.savefig(args.output / 'posterior_costs_topk_%d.png' % args.topk)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('input', type=pathlib.Path, help='input dataset')
-    parser.add_argument('output', type=pathlib.Path, help='output prefix')
+    parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
+    parser.add_argument('output', type=pathlib.Path, default='../output/costs/test', help='output prefix')
+    parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
     parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
                         help='path to a serialized numpy array containng the cost matrix')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
