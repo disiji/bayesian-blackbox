@@ -164,9 +164,6 @@ def eval(experiment_name: str,
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
-        if idx % (num_samples // 10) == 0:
-            print(idx, '...')
-
         if metric == 'accuracy':
             model.update(category, observation)
 
@@ -471,8 +468,8 @@ def main_calibration_error_topk(RUNS: int, MODE: str, DATASET: str, topk=1, SAMP
 
 if __name__ == "__main__":
 
-    RUNS = 10
-    TOP_K = 5
+    RUNS = 1000
+    TOP_K = 10
 
     # dataset = str(sys.argv[1])
     dataset = 'cifar100'
@@ -481,5 +478,5 @@ if __name__ == "__main__":
 
     for MODE in ['min', 'max']:
         print(dataset, MODE, '...')
-        main_accuracy_topk_two_stage(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=False, EVAL=True, PLOT=True)
-        main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=False, EVAL=True, PLOT=True)
+        main_accuracy_topk_two_stage(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=True, EVAL=True, PLOT=True)
