@@ -58,10 +58,11 @@ class Model:
 class BetaBernoulli(Model):
     def __init__(self, k: int, prior=None):
         self._k = k
+        self._prior = prior
         if prior is None:
-            self._params = np.ones((k, 2)) * 0.5
-        else:
-            self._params = prior
+            self._prior = np.ones((k, 2)) * 0.5
+
+        self._params = copy.deepcopy(self._prior)
 
     @property
     def eval(self):
@@ -70,6 +71,11 @@ class BetaBernoulli(Model):
     @property
     def variance(self):
         return beta.var(self._params[:, 0], self._params[:, 1])
+
+    @property
+    def frequentist_eval(self):
+        counts = self._params - self._prior
+        return counts[:, 0] / (counts[:, 0] + counts[:, 1])
 
     def update(self, category: int, observation: bool):
         """Updates the posterior of the Beta-Bernoulli model."""
@@ -133,9 +139,7 @@ class SumOfBetaEce(Model):
         self._diagonal = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
 
         # parameters to update:
-        self._alpha = None
-        self._beta = None
-        self._counts = np.ones((num_bins,)) * 0.0001
+        self._counts = np.ones((num_bins, 2)) * 0.0001
         self._confidence = np.zeros((num_bins,))
 
         # initialize the mode of each Beta distribution on diagonal
@@ -158,7 +162,8 @@ class SumOfBetaEce(Model):
         if self._weight:  # pool weights
             weight = self._weight
         else:  # online weights
-            weight = self._counts / sum(self._counts)
+            tmp = np.sum(self._counts, axis=1)
+            weight = tmp / sum(tmp)
 
         return np.dot(np.abs(theta - self._confidence), weight).squeeze()
 
@@ -168,8 +173,16 @@ class SumOfBetaEce(Model):
         if self._weight:  # pool weights
             weight = self._weight
         else:  # online weights
-            weight = self._counts / sum(self._counts)
+            tmp = np.sum(self._counts, axis=1)
+            weight = tmp / sum(tmp)
         return np.inner(weight * weight, variance_bin)
+
+    @property
+    def frequentist_eval(self):
+        tmp = np.sum(self._counts, axis=1)
+        accuracy = self._counts[:, 0] / tmp
+        weight = tmp / sum(tmp)
+        return np.dot(np.abs(accuracy - self._confidence), weight).squeeze()
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample ECEs from posterior.
@@ -191,7 +204,8 @@ class SumOfBetaEce(Model):
         if self._weight:  # pool weights
             weight = self._weight
         else:  # online weights
-            weight = self._counts / sum(self._counts)
+            tmp = np.sum(self._counts, axis=1)
+            weight = tmp / sum(tmp)
         return np.dot(np.abs(theta - self._confidence), weight).squeeze()
 
     def update(self, score: float, observation: bool):
@@ -206,17 +220,18 @@ class SumOfBetaEce(Model):
             bin_idx -= 1
         if observation:
             self._alpha[bin_idx] += 1
+            self._counts[bin_idx][0] += 1
         else:
             self._beta[bin_idx] += 1
-        self._confidence[bin_idx] = (self._confidence[bin_idx] * self._counts[bin_idx] + score) / (
-                self._counts[bin_idx] + 1)
-        self._counts[bin_idx] += 1
+            self._counts[bin_idx][1] += 1
+        self._confidence[bin_idx] = (self._confidence[bin_idx] * (self._counts[bin_idx].sum() - 1) + score) / (
+            self._counts[bin_idx].sum())
 
     def update_batch(self, scores: List[float], observations: List[bool]):
         """
 
         :param scores:
-        :param predictions:
+        :param observations:
         :return:
         """
         for score, observation in zip(scores, observations):
@@ -287,6 +302,19 @@ class ClasswiseEce(Model):
         An (k,) array of ECE evaluate for each class.
         """
         classwise_ece = np.array([self._classwise_ece_models[class_idx].eval for class_idx in range(self._k)])
+        return classwise_ece
+
+    @property
+    def frequentist_eval(self) -> np.ndarray:
+        """
+        Evaluate ECE for each class
+
+        Returns
+        =======
+        An (k,) array of ECE evaluate for each class.
+        """
+        classwise_ece = np.array(
+            [self._classwise_ece_models[class_idx].frequentist_eval for class_idx in range(self._k)])
         return classwise_ece
 
     @property

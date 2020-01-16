@@ -7,8 +7,7 @@ from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, _get_ground_truth, _get_accuracy_k, \
-    _get_ece_k
+from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, _get_ground_truth
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 
@@ -75,8 +74,6 @@ def get_samples_topk(categories: List[int],
 
     while (idx < num_samples):
 
-        if idx % (num_samples // 10) == 0:
-            print(idx, '...')
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
@@ -146,6 +143,7 @@ def eval(experiment_name: str,
     :return non_cumulative_metric: (num_samples, ) array.
             Average metric (accuracy or ece) evaluated with model.eval of the selected topk arms at each step.
     """
+
     dir = OUTPUT_DIR + experiment_name
     categories = pickle.load(open(dir + '/sampled_categories.pkl', "rb"))
     observations = pickle.load(open(dir + '/sampled_observations.pkl', "rb"))
@@ -166,6 +164,9 @@ def eval(experiment_name: str,
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
+        if idx % (num_samples // 10) == 0:
+            print(idx, '...')
+
         if metric == 'accuracy':
             model.update(category, observation)
 
@@ -181,12 +182,9 @@ def eval(experiment_name: str,
 
         # evaluation
         avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / topk
-        if metric == 'accuracy':
-            cumulative_metric[idx] = _get_accuracy_k(categories[:idx + 1], observations[:idx + 1],
-                                                     num_classes).mean()
-        elif metric == 'calibration_error':
-            cumulative_metric[idx] = _get_ece_k(categories[:idx + 1], observations[:idx + 1],
-                                                confidences[:idx + 1], num_classes, num_bins=10).mean()
+
+        cumulative_metric[idx] = model.frequentist_eval
+
         non_cumulative_metric[idx] = metric_val[topk_arms].mean()
 
     # write eval results to file
@@ -483,5 +481,5 @@ if __name__ == "__main__":
 
     for MODE in ['min', 'max']:
         print(dataset, MODE, '...')
-        # main_accuracy_topk_two_stage(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=True, EVAL=True, PLOT=True
-        main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=True, EVAL=True, PLOT=True)
+        main_accuracy_topk_two_stage(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=False, EVAL=True, PLOT=True)
+        main_calibration_error_topk(RUNS, MODE, dataset, topk=TOP_K, SAMPLE=False, EVAL=True, PLOT=True)

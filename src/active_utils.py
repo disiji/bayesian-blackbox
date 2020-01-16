@@ -92,6 +92,9 @@ def _get_confidence_k(categories: List[int], confidences: List[float], num_class
     return confidence_k
 
 
+
+
+
 def _get_accuracy_k(categories: List[int], observations: List[bool], num_classes: int) -> np.ndarray:
     observations = np.array(observations) * 1.0
     df = pd.DataFrame(list(zip(categories, observations)), columns=['Predicted', 'Observations'])
