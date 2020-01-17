@@ -338,7 +338,7 @@ def main(args: argparse.Namespace) -> None:
     axes.plot(x_axis, active_success, label='active (uniform prior)')
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
-    plt.savefig(args.output / 'success_curve_topk_%d.png' % args.topk)
+    plt.savefig(args.output / ('success_curve_topk_%d.png' % args.topk))
 
     fig, axes = plt.subplots(1, 1)
     n_samples = 1000
@@ -348,7 +348,7 @@ def main(args: argparse.Namespace) -> None:
     for i in range(dataset.num_classes):
         hist[i] = (max_expected_costs == i).sum() / n_samples
     axes.bar(np.arange(dataset.num_classes), hist)
-    fig.savefig(args.output / 'posterior_costs_topk_%d.png' % args.topk)
+    fig.savefig(args.output / ('posterior_costs_topk_%d.png' % args.topk))
 
 
 if __name__ == '__main__':
