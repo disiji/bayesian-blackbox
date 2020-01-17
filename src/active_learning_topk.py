@@ -22,7 +22,7 @@ DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
 FIGURE_DIR = "../output/figures"
-RUNS = 10
+RUNS = 100
 
 
 def get_samples_topk(args: argparse.Namespace,
@@ -274,7 +274,7 @@ def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: in
     for method in ['random', 'ts']:
         for r in range(RUNS):
             experiment_name = '%s_ece_%s_run_idx_%d' % (args.dataset, method, r)
-            dir = args.outputdir / experiment_name
+            dir = args.output / experiment_name
 
             avg_num_agreement_dict[method] += pickle.load(open(dir / "avg_num_agreement_%s_%s_top%d.pkl" % (
                 'accuracy', MODE, args.topk)), "rb")
@@ -453,5 +453,5 @@ if __name__ == "__main__":
 
     for MODE in ['min', 'max']:
         print(args.dataset, MODE, '...')
-        # main_accuracy_topk_two_stage(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)
+        main_accuracy_topk_two_stage(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)
         main_calibration_error_topk(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)

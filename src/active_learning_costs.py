@@ -230,7 +230,7 @@ def pretty_print(arr):
         print(out)
 
 
-def eval(results: np.ndarray, highest_cost_classses: list, topk: int) -> Dict[str, np.ndarray]:
+def eval(results: np.ndarray, highest_cost_classes: list, topk: int) -> Dict[str, np.ndarray]:
     """
 
     :param results:(num_runs, num_samples // LOG_FREQ, num_classes)
@@ -238,12 +238,12 @@ def eval(results: np.ndarray, highest_cost_classses: list, topk: int) -> Dict[st
     :param topk: int
     :return:
     """
-    assert len(highest_cost_classses) == topk
+    assert len(highest_cost_classes) == topk
     avg_num_agreement = [None] * results.shape[1]
 
     for idx in range(results.shape[0]):
         topk_arms = (results[:, idx, :]).squeeze().argsort(axis=-1)[:, -topk:].flatten().tolist()
-        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in highest_cost_classses]) * 1.0 / (
+        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in highest_cost_classes]) * 1.0 / (
                 topk * results.shape[0])
     return {
         'avg_num_agreement': avg_num_agreement,
@@ -353,14 +353,13 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('output', type=pathlib.Path, default='../output/costs/test', help='output prefix')
+    parser.add_argument('output', type=pathlib.Path, default='../output/costs/cifar100_', help='output prefix')
     parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
     parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
                         help='path to a serialized numpy array containng the cost matrix')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
     parser.add_argument('-k', type=float, default=2, help='relative cost')
     parser.add_argument('--superclass', action='store_true')
-    parser.add_argument('--human', action='store_true')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)
