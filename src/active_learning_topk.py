@@ -277,12 +277,12 @@ def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: in
             experiment_name = '%s_ece_%s_run_idx_%d' % (args.dataset, method, r)
             dir = args.output / experiment_name
 
-            avg_num_agreement_dict[method] += pickle.load(open(dir / "avg_num_agreement_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk)), "rb")
-            cumulative_metric_dict[method] += pickle.load(open(dir / "cumulative_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk)), "rb")
-            non_cumulative_metric_dict[method] += pickle.load(open(dir / "non_cumulative_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk)), "rb")
+            avg_num_agreement_dict[method] += pickle.load(open(dir / ("avg_num_agreement_%s_%s_top%d.pkl" % (
+                'calibration_error', MODE, args.topk))), "rb")
+            cumulative_metric_dict[method] += pickle.load(open(dir / ("cumulative_%s_%s_top%d.pkl" % (
+                'calibration_error', MODE, args.topk))), "rb")
+            non_cumulative_metric_dict[method] += pickle.load(open(dir / ("non_cumulative_%s_%s_top%d.pkl" % (
+                'calibration_error', MODE, args.topk))), "rb")
 
         avg_num_agreement_dict[method] /= RUNS
         cumulative_metric_dict[method] /= RUNS
