@@ -235,7 +235,7 @@ def eval(results: np.ndarray, highest_cost_classses: list, topk: int) -> Dict[st
 
     :param results:(num_runs, num_samples // LOG_FREQ, num_classes)
     :param highest_cost_classses: list of integers of length topk. Ground truth of topk classes.
-    :param topk:
+    :param topk: int
     :return:
     """
     assert len(highest_cost_classses) == topk

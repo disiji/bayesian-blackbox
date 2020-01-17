@@ -92,9 +92,6 @@ def _get_confidence_k(categories: List[int], confidences: List[float], num_class
     return confidence_k
 
 
-
-
-
 def _get_accuracy_k(categories: List[int], observations: List[bool], num_classes: int) -> np.ndarray:
     observations = np.array(observations) * 1.0
     df = pd.DataFrame(list(zip(categories, observations)), columns=['Predicted', 'Observations'])
@@ -159,7 +156,7 @@ def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
             if len(candidates) >= topk:
                 return random.sample(candidates, topk)
             else:  # there are less than topk available arms to play
-                return random_sampling(deques, topk=1)
+                return random_sampling(deques, topk= 1)
 
 
 def thompson_sampling(deques: List[deque],

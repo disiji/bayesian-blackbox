@@ -7,6 +7,7 @@ from typing import List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, _get_ground_truth
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
@@ -16,6 +17,9 @@ TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
+
+RUNS = 100
+OUTPUT_DIR = "../output/active_learning/"
 
 
 def get_samples(categories: List[int],
@@ -112,7 +116,6 @@ def main_accuracy(RUNS, MODE, DATASET):
         'bayesian_ucb': copy.deepcopy(np.zeros((N,))),
     }
     for r in tqdm(range(RUNS)):
-        print(r, 'random')
         success_rate_dict['random'] += get_samples(categories,
                                                    observations,
                                                    confidences,
@@ -123,7 +126,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                    metric='accuracy',
                                                    prior=UNIFORM_PRIOR,
                                                    random_seed=r)
-        print(r, 'ts_uniform')
         success_rate_dict['ts_uniform'] += get_samples(categories,
                                                        observations,
                                                        confidences,
@@ -134,7 +136,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                        metric='accuracy',
                                                        prior=UNIFORM_PRIOR,
                                                        random_seed=r)
-        print(r, 'ttts_uniform')
         success_rate_dict['ttts_uniform'] += get_samples(categories,
                                                          observations,
                                                          confidences,
@@ -145,7 +146,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                          metric='accuracy',
                                                          prior=UNIFORM_PRIOR,
                                                          random_seed=r)
-        print(r, 'ts_informed')
         success_rate_dict['ts_informed'] += get_samples(categories,
                                                         observations,
                                                         confidences,
@@ -156,7 +156,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                         metric='accuracy',
                                                         prior=INFORMED_PRIOR,
                                                         random_seed=r)
-        print(r, 'ttts_informed')
         success_rate_dict['ttts_informed'] += get_samples(categories,
                                                           observations,
                                                           confidences,
@@ -167,7 +166,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                           metric='accuracy',
                                                           prior=INFORMED_PRIOR,
                                                           random_seed=r)
-        print(r, 'epsilon_greedy')
         success_rate_dict['epsilon_greedy'] += get_samples(categories,
                                                            observations,
                                                            confidences,
@@ -178,7 +176,6 @@ def main_accuracy(RUNS, MODE, DATASET):
                                                            metric='accuracy',
                                                            prior=UNIFORM_PRIOR,
                                                            random_seed=r)
-        print(r, 'bayesian_ucb')
         success_rate_dict['bayesian_ucb'] += get_samples(categories,
                                                          observations,
                                                          confidences,
@@ -192,11 +189,11 @@ def main_accuracy(RUNS, MODE, DATASET):
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'acc', MODE, method, RUNS)
+        output_name = OUTPUT_DIR + "%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'acc', MODE, method, RUNS)
         pickle.dump(success_rate_dict[method], open(output_name, "wb"))
 
     # evaluation
-    figname = "../output/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, 'acc', MODE, RUNS)
+    figname = OUTPUT_DIR + "%s_%s_%s_runs_%d.pdf" % (DATASET, 'acc', MODE, RUNS)
     comparison_plot(success_rate_dict, figname)
 
 
@@ -217,8 +214,7 @@ def main_calibration_error(RUNS, MODE, DATASET):
         'epsilon_greedy': copy.deepcopy(np.zeros((N,))),
         'bayesian_ucb': copy.deepcopy(np.zeros((N,))),
     }
-    for r in range(RUNS):
-        print(r, 'random')
+    for r in tqdm(range(RUNS)):
         success_rate_dict['random'] += get_samples(categories,
                                                    observations,
                                                    confidences,
@@ -229,7 +225,6 @@ def main_calibration_error(RUNS, MODE, DATASET):
                                                    metric='calibration_error',
                                                    prior=None,
                                                    random_seed=r)
-        print(r, 'ts')
         success_rate_dict['ts'] += get_samples(categories,
                                                observations,
                                                confidences,
@@ -240,7 +235,6 @@ def main_calibration_error(RUNS, MODE, DATASET):
                                                metric='calibration_error',
                                                prior=None,
                                                random_seed=r)
-        print(r, 'ttts')
         success_rate_dict['ttts'] += get_samples(categories,
                                                  observations,
                                                  confidences,
@@ -251,7 +245,6 @@ def main_calibration_error(RUNS, MODE, DATASET):
                                                  metric='calibration_error',
                                                  prior=None,
                                                  random_seed=r)
-        print(r, 'epsilon_greedy')
         success_rate_dict['epsilon_greedy'] += get_samples(categories,
                                                            observations,
                                                            confidences,
@@ -262,7 +255,6 @@ def main_calibration_error(RUNS, MODE, DATASET):
                                                            metric='calibration_error',
                                                            prior=None,
                                                            random_seed=r)
-        print(r, 'bayesian_ucb')
         success_rate_dict['bayesian_ucb'] += get_samples(categories,
                                                          observations,
                                                          confidences,
@@ -276,24 +268,24 @@ def main_calibration_error(RUNS, MODE, DATASET):
 
     for method in success_rate_dict:
         success_rate_dict[method] /= RUNS
-        output_name = "../output/active_learning/%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'ece', MODE, method, RUNS)
+        output_name = OUTPUT_DIR + "%s_%s_%s_%s_runs_%d.pkl" % (DATASET, 'ece', MODE, method, RUNS)
         pickle.dump(success_rate_dict[method], open(output_name, "wb"))
 
     # evaluation
-    figname = "../output/active_learning/%s_%s_%s_runs_%d.pdf" % (DATASET, 'ece', MODE, RUNS)
+    figname = OUTPUT_DIR + "%s_%s_%s_runs_%d.pdf" % (DATASET, 'ece', MODE, RUNS)
     comparison_plot(success_rate_dict, figname)
 
 
 if __name__ == "__main__":
 
-    RUNS = 10
+    dataset = str(sys.argv[1])
+    RUNS = int(sys.argv[2])
 
-    # dataset = str(sys.argv[1])
-    dataset = 'cifar100'
+    # dataset = 'cifar100'
     if dataset not in DATASET_LIST:
         raise ValueError("%s is not in DATASET_LIST." % dataset)
 
     for MODE in ['min', 'max']:
         print(dataset, MODE, '...')
-        main_accuracy(RUNS, MODE, dataset)
+        # main_accuracy(RUNS, MODE, dataset)
         main_calibration_error(RUNS, MODE, dataset)
