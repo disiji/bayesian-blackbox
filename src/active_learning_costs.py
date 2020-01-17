@@ -200,7 +200,8 @@ def select_and_label(dataset: Dataset,
     mpe = np.zeros((n_samples // LOG_FREQ, dataset.num_classes))
 
     # Run experiment
-    for i in range(n_samples):
+    i = 0
+    while i < n_samples:
         sample = model.sample()
         choices = choice_fn(sample)
 
