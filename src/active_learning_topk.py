@@ -240,17 +240,17 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
         non_cumulative_metric_dict[method] /= RUNS
 
     _comparison_plot(avg_num_agreement_dict,
-                     args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'acc', MODE, RUNS, args.topk)),
                      'Avg number of agreement')
 
     _comparison_plot(cumulative_metric_dict,
-                     args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'acc', MODE, RUNS, args.topk)),
                      'Cumulative accuracy')
 
     _comparison_plot(non_cumulative_metric_dict,
-                     args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'acc', MODE, RUNS, args.topk)),
                      'Non cumulative accuracy')
 
@@ -289,17 +289,17 @@ def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: in
         non_cumulative_metric_dict[method] /= RUNS
 
     _comparison_plot(avg_num_agreement_dict,
-                     args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'ece', MODE, args.topk)),
                      'Avg number of agreement')
 
     _comparison_plot(cumulative_metric_dict,
-                     args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'ece', MODE, args.topk)),
                      'Cumulative ECE')
 
     _comparison_plot(non_cumulative_metric_dict,
-                     args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
+                     args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
                          args.dataset, 'ece', MODE, args.topk)),
                      'Non cumulative ECE')
 
