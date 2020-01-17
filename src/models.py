@@ -74,7 +74,7 @@ class BetaBernoulli(Model):
 
     @property
     def frequentist_eval(self):
-        counts = self._params - self._prior
+        counts = self._params - self._prior + 0.0001
         return counts[:, 0] / (counts[:, 0] + counts[:, 1])
 
     def update(self, category: int, observation: bool):

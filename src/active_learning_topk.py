@@ -148,9 +148,9 @@ def eval(args: argparse.Namespace,
     elif metric == 'calibration_error':
         model = copy.deepcopy(ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None))
 
-    avg_num_agreement = [None] * num_samples
-    cumulative_metric = [None] * num_samples
-    non_cumulative_metric = [None] * num_samples
+    avg_num_agreement = copy.deepcopy(np.zeros((num_samples,)))
+    cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
+    non_cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
@@ -174,9 +174,6 @@ def eval(args: argparse.Namespace,
         non_cumulative_metric[idx] = metric_val[topk_arms].mean()
 
     # write eval results to file
-    avg_num_agreement = np.array(avg_num_agreement)
-    cumulative_metric = np.array(cumulative_metric)
-    non_cumulative_metric = np.array(non_cumulative_metric)
 
     pickle.dump(avg_num_agreement,
                 open(dir / ("avg_num_agreement_%s_%s_top%d.pkl" % (
@@ -238,6 +235,10 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
             non_cumulative_metric_dict[method] += pickle.load(open(dir / ("non_cumulative_%s_%s_top%d.pkl" % (
                 'accuracy', MODE, args.topk)), "rb"))
 
+        avg_num_agreement_dict[method] /= RUNS
+        cumulative_metric_dict[method] /= RUNS
+        non_cumulative_metric_dict[method] /= RUNS
+
     _comparison_plot(avg_num_agreement_dict,
                      args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
                          args.dataset, 'acc', MODE, RUNS, args.topk)),
@@ -246,7 +247,7 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
     _comparison_plot(cumulative_metric_dict,
                      args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
                          args.dataset, 'acc', MODE, RUNS, args.topk)),
-                     'Cummlative accuracy')
+                     'Cumulative accuracy')
 
     _comparison_plot(non_cumulative_metric_dict,
                      args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
@@ -277,11 +278,15 @@ def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: in
             dir = args.output / experiment_name
 
             avg_num_agreement_dict[method] += pickle.load(open(dir / "avg_num_agreement_%s_%s_top%d.pkl" % (
-                'accuracy', MODE, args.topk)), "rb")
+                'calibration_error', MODE, args.topk)), "rb")
             cumulative_metric_dict[method] += pickle.load(open(dir / "cumulative_%s_%s_top%d.pkl" % (
-                'accuracy', MODE, args.topk)), "rb")
+                'calibration_error', MODE, args.topk)), "rb")
             non_cumulative_metric_dict[method] += pickle.load(open(dir / "non_cumulative_%s_%s_top%d.pkl" % (
-                'accuracy', MODE, args.topk)), "rb")
+                'calibration_error', MODE, args.topk)), "rb")
+
+        avg_num_agreement_dict[method] /= RUNS
+        cumulative_metric_dict[method] /= RUNS
+        non_cumulative_metric_dict[method] /= RUNS
 
     _comparison_plot(avg_num_agreement_dict,
                      args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_topk_%d.pdf" % (
@@ -291,7 +296,7 @@ def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: in
     _comparison_plot(cumulative_metric_dict,
                      args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
                          args.dataset, 'ece', MODE, args.topk)),
-                     'Cummlative ECE')
+                     'Cumulative ECE')
 
     _comparison_plot(non_cumulative_metric_dict,
                      args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_topk_%d.pdf" % (
