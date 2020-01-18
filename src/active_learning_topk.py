@@ -139,38 +139,58 @@ def eval(args: argparse.Namespace,
     confidences = pickle.load(open(dir / 'sampled_scores.pkl', "rb"))
 
     ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode, topk=args.topk)
+
+    evaluation_freq = args.evaluation_freq
     num_samples = len(categories)
+    output_length = num_samples // evaluation_freq
 
     if metric == 'accuracy':
         model = BetaBernoulli(num_classes, prior)
 
     elif metric == 'calibration_error':
         model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
+<<<<<<< HEAD
 
     avg_num_agreement = np.zeros((num_samples,))
     cumulative_metric = np.zeros((num_samples,))
     non_cumulative_metric = np.zeros((num_samples,))
 
+    topk_arms = np.zeros((num_classes,), dtype=np.bool_)
+=======
+
+    avg_num_agreement = np.zeros((num_samples,))
+    cumulative_metric = np.zeros((num_samples,))
+    non_cumulative_metric = np.zeros((num_samples,))
+>>>>>>> origin/master
+
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
+        # Always update
         if metric == 'accuracy':
             model.update(category, observation)
 
         elif metric == 'calibration_error':
             model.update(category, observation, confidence)
 
-        # select TOPK arms
-        metric_val = model.eval
-        if mode == 'min':
-            topk_arms = metric_val.argsort()[:args.topk].flatten().tolist()
-        elif mode == 'max':
-            topk_arms = metric_val.argsort()[-args.topk:][::-1].flatten().tolist()
+        # To save time, evaluate less frequently
+        if (idx % evaluation_freq) == 0:
+            eval_idx = idx // evaluation_freq
 
-        # evaluation
-        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / args.topk
-        # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
-        cumulative_metric[idx] = model.frequentist_eval.mean()
-        non_cumulative_metric[idx] = metric_val[topk_arms].mean()
+            # select TOPK arms
+            metric_val = model.eval
+
+            topk_arms[:] = 0
+            if mode == 'min':
+                indices = metric_val.argsort()[:args.topk]
+            elif mode == 'max':
+                indices = metric_val.argsort()[-args.topk:]
+            topk_arms[indices] = 1
+
+            # evaluation
+            avg_num_agreement[eval_idx] = (topk_arms == ground_truth).mean()
+            # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
+            cumulative_metric[eval_idx] = model.frequentist_eval.mean()
+            non_cumulative_metric[eval_idx] = metric_val[topk_arms].mean()
 
     # write eval results to file
 
@@ -443,12 +463,12 @@ def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('-output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
-    parser.add_argument('-fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
-    parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
+    parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
+    parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
+    parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
+    parser.add_argument('--evaluation_freq', type=int,  default=1, help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)
