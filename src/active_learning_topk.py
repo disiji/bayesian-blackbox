@@ -15,6 +15,8 @@ from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
+
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
@@ -22,7 +24,7 @@ DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
 FIGURE_DIR = "../output/figures"
-RUNS = 100
+RUNS = 1
 
 
 def get_samples_topk(args: argparse.Namespace,
@@ -133,12 +135,15 @@ def eval(args: argparse.Namespace,
     :return non_cumulative_metric: (num_samples, ) array.
             Average metric (accuracy or ece) evaluated with model.eval of the selected topk arms at each step.
     """
+    logger.debug(f'Eval')
 
     dir = args.output / experiment_name
+    logger.debug(f'Loading pickle files')
     categories = pickle.load(open(dir / 'sampled_categories.pkl', "rb"))
     observations = pickle.load(open(dir / 'sampled_observations.pkl', "rb"))
     confidences = pickle.load(open(dir / 'sampled_scores.pkl', "rb"))
 
+    logger.debug(f'Getting ground truth')
     ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, metric, mode, topk=args.topk)
     num_samples = len(categories)
 
@@ -155,12 +160,15 @@ def eval(args: argparse.Namespace,
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
+        logger.debug(f'Turn {idx}')
 
         if metric == 'accuracy':
             model.update(category, observation)
 
         elif metric == 'calibration_error':
             model.update(category, observation, confidence)
+
+        logger.debug(f'Update done')
 
         # select TOPK arms
         metric_val = model.eval
@@ -177,6 +185,10 @@ def eval(args: argparse.Namespace,
         # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
         cumulative_metric[idx] = model.frequentist_eval.mean()
         non_cumulative_metric[idx] = metric_val[topk_arms].mean()
+
+        # TODO: @rlogan remove
+        if idx > 10:
+            break
 
     # write eval results to file
 
@@ -260,53 +272,53 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
                      'Non cumulative accuracy')
 
 
-def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: int) -> None:
-    avg_num_agreement_dict = {
-        'random': np.zeros((N,)),
-        'ts_uniform': np.zeros((N,)),
-        'ts_informed': np.zeros((N,)),
-    }
-    cumulative_metric_dict = {
-        'random': np.zeros((N,)),
-        'ts_uniform': np.zeros((N,)),
-        'ts_informed': np.zeros((N,)),
-    }
-    non_cumulative_metric_dict = {
-        'random': np.zeros((N,)),
-        'ts_uniform': np.zeros((N,)),
-        'ts_informed': np.zeros((N,)),
-    }
-
-    for method in ['random', 'ts']:
-        for r in range(RUNS):
-            experiment_name = '%s_ece_%s_run_idx_%d' % (args.dataset, method, r)
-            dir = args.output / experiment_name
-
-            avg_num_agreement_dict[method] += pickle.load(open(dir / ("avg_num_agreement_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk))), "rb")
-            cumulative_metric_dict[method] += pickle.load(open(dir / ("cumulative_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk))), "rb")
-            non_cumulative_metric_dict[method] += pickle.load(open(dir / ("non_cumulative_%s_%s_top%d.pkl" % (
-                'calibration_error', MODE, args.topk))), "rb")
-
-        avg_num_agreement_dict[method] /= RUNS
-        cumulative_metric_dict[method] /= RUNS
-        non_cumulative_metric_dict[method] /= RUNS
-
-    _comparison_plot(avg_num_agreement_dict,
-                     args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_top%d.pdf" % (
-                         args.dataset, 'ece', MODE, args.topk)),
-                     'Avg number of agreement')
-
-    _comparison_plot(cumulative_metric_dict,
-                     args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
-                         args.dataset, 'ece', MODE, args.topk)),
-                     'Cumulative ECE')
-
-    _comparison_plot(non_cumulative_metric_dict,
-                     args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
-                         args.dataset, 'ece', MODE, args.topk)),
-                     'Non cumulative ECE')
+# def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: int) -> None:
+#     avg_num_agreement_dict = {
+#         'random': np.zeros((N,)),
+#         'ts_uniform': np.zeros((N,)),
+#         'ts_informed': np.zeros((N,)),
+#     }
+#     cumulative_metric_dict = {
+#         'random': np.zeros((N,)),
+#         'ts_uniform': np.zeros((N,)),
+#         'ts_informed': np.zeros((N,)),
+#     }
+#     non_cumulative_metric_dict = {
+#         'random': np.zeros((N,)),
+#         'ts_uniform': np.zeros((N,)),
+#         'ts_informed': np.zeros((N,)),
+#     }
+# 
+#     for method in ['random', 'ts']:
+#         for r in range(RUNS):
+#             experiment_name = '%s_ece_%s_run_idx_%d' % (args.dataset, method, r)
+#             dir = args.output / experiment_name
+# 
+#             avg_num_agreement_dict[method] += pickle.load(open(dir / ("avg_num_agreement_%s_%s_top%d.pkl" % (
+#                 'calibration_error', MODE, args.topk))), "rb")
+#             cumulative_metric_dict[method] += pickle.load(open(dir / ("cumulative_%s_%s_top%d.pkl" % (
+#                 'calibration_error', MODE, args.topk))), "rb")
+#             non_cumulative_metric_dict[method] += pickle.load(open(dir / ("non_cumulative_%s_%s_top%d.pkl" % (
+#                 'calibration_error', MODE, args.topk))), "rb")
+# 
+#         avg_num_agreement_dict[method] /= RUNS
+#         cumulative_metric_dict[method] /= RUNS
+#         non_cumulative_metric_dict[method] /= RUNS
+# 
+#     _comparison_plot(avg_num_agreement_dict,
+#                      args.fig_dir / ("avg_num_agreement_%s_%s_%s_runs_%d_top%d.pdf" % (
+#                          args.dataset, 'ece', MODE, args.topk)),
+#                      'Avg number of agreement')
+# 
+#     _comparison_plot(cumulative_metric_dict,
+#                      args.fig_dir / ("cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
+#                          args.dataset, 'ece', MODE, args.topk)),
+#                      'Cumulative ECE')
+# 
+#     _comparison_plot(non_cumulative_metric_dict,
+#                      args.fig_dir / ("non_cumulative_%s_%s_%s_runs_%d_top%d.pdf" % (
+#                          args.dataset, 'ece', MODE, args.topk)),
+#                      'Non cumulative ECE')
 
 
 def main_accuracy_topk_two_stage(args: argparse.Namespace, MODE: str, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -393,8 +405,10 @@ def main_accuracy_topk_two_stage(args: argparse.Namespace, MODE: str, SAMPLE=Tru
 
 
 def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True, EVAL=True, PLOT=True) -> None:
+    logger.debug(f'Main calibration error topk - {MODE}')
     NUM_CLASSES = num_classes_dict[args.dataset]
 
+    logger.debug('Preparing data')
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
     N = len(observations)
 
@@ -413,18 +427,18 @@ def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True
                              prior=None,
                              random_seed=r)
 
-            get_samples_topk(args,
-                             categories,
-                             observations,
-                             confidences,
-                             NUM_CLASSES,
-                             N,
-                             experiment_name=args.dataset + '_ece_ts_run_idx_' + str(r),
-                             sample_method='ts',
-                             mode=MODE,
-                             metric='calibration_error',
-                             prior=None,
-                             random_seed=r)
+            # get_samples_topk(args,
+            #                  categories,
+            #                  observations,
+            #                  confidences,
+            #                  NUM_CLASSES,
+            #                  N,
+            #                  experiment_name=args.dataset + '_ece_ts_run_idx_' + str(r),
+            #                  sample_method='ts',
+            #                  mode=MODE,
+            #                  metric='calibration_error',
+            #                  prior=None,
+            #                  random_seed=r)
 
     if EVAL:
         for r in tqdm(range(RUNS)):
@@ -444,8 +458,8 @@ def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True
                 mode=MODE,
                 prior=None)
 
-    if PLOT:
-        comparison_plot_calibration_error(args, MODE, N)
+    # if PLOT:
+    #     comparison_plot_calibration_error(args, MODE, N)
 
 
 if __name__ == "__main__":
@@ -454,13 +468,21 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
     parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
     parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
+    parser.add_argument('--debug', action='store_true')
     args, _ = parser.parse_known_args()
 
-    logging.basicConfig(level=logging.INFO)
+    if args.debug:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    logging.basicConfig(level=level)
+
     if args.dataset not in DATASET_LIST:
         raise ValueError("%s is not in DATASET_LIST." % args.dataset)
 
+
     for MODE in ['min', 'max']:
         print(args.dataset, MODE, '...')
-        main_accuracy_topk_two_stage(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)
+        # main_accuracy_topk_two_stage(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)
         main_calibration_error_topk(args, MODE, SAMPLE=True, EVAL=True, PLOT=True)
+
