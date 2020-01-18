@@ -159,7 +159,7 @@ class SumOfBetaEce(Model):
     @property
     def eval(self):
         theta = self._alpha / (self._alpha + self._beta)
-        if self._weight:  # pool weights
+        if self._weight is not None:  # pool weights
             weight = self._weight
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
@@ -170,7 +170,7 @@ class SumOfBetaEce(Model):
     @property
     def variance(self):
         variance_bin = beta.var(self._alpha, self._beta)
-        if self._weight:  # pool weights
+        if self._weight is not None:  # pool weights
             weight = self._weight
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
@@ -201,7 +201,7 @@ class SumOfBetaEce(Model):
         theta = np.random.beta(self._alpha, self._beta,
                                size=(num_samples, self._num_bins))
         # compute ECE with samples
-        if self._weight:  # pool weights
+        if self._weight is not None:  # pool weights
             weight = self._weight
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
