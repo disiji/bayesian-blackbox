@@ -199,7 +199,7 @@ class SumOfBetaEce(Model):
 
         # draw samples from each Beta distribution
         theta = np.random.beta(self._alpha, self._beta,
-                               size=(num_samples, self._num_bins))  # theta: (n_samples, num_bins)
+                               size=(num_samples, self._num_bins))
         # compute ECE with samples
         if self._weight:  # pool weights
             weight = self._weight
