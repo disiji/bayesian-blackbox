@@ -43,9 +43,9 @@ def get_samples_topk(args: argparse.Namespace,
     random.seed(random_seed)
 
     if metric == 'accuracy':
-        model = copy.deepcopy(BetaBernoulli(num_classes, prior))
+        model = BetaBernoulli(num_classes, prior)
     elif metric == 'calibration_error':
-        model = copy.deepcopy(ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None))
+        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
     deques = [deque() for _ in range(num_classes)]
     for (category, score, observation) in zip(categories, confidences, observations):
@@ -143,14 +143,16 @@ def eval(args: argparse.Namespace,
     num_samples = len(categories)
 
     if metric == 'accuracy':
-        model = copy.deepcopy(BetaBernoulli(num_classes, prior))
+        model = BetaBernoulli(num_classes, prior)
 
     elif metric == 'calibration_error':
-        model = copy.deepcopy(ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None))
+        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
-    avg_num_agreement = copy.deepcopy(np.zeros((num_samples,)))
-    cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
-    non_cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
+    avg_num_agreement = np.zeros((num_samples,))
+    cumulative_metric = np.zeros((num_samples,))
+    non_cumulative_metric = np.zeros((num_samples,))
+
+    topk_arms = np.zeros((num_classes,), dtype=np.bool_)
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
@@ -162,13 +164,16 @@ def eval(args: argparse.Namespace,
 
         # select TOPK arms
         metric_val = model.eval
+
+        topk_arms[:] = 0
         if mode == 'min':
-            topk_arms = metric_val.argsort()[:args.topk].flatten().tolist()
+            indices = metric_val.argsort()[:args.topk]
         elif mode == 'max':
-            topk_arms = metric_val.argsort()[-args.topk:][::-1].flatten().tolist()
+            indices = metric_val.argsort()[-args.topk:]
+        topk_arms[indices] = 1
 
         # evaluation
-        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / args.topk
+        avg_num_agreement[idx] = (topk_arms == ground_truth).mean()
         # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
         cumulative_metric[idx] = model.frequentist_eval.mean()
         non_cumulative_metric[idx] = metric_val[topk_arms].mean()
@@ -208,19 +213,19 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], figname: str, ylab
 
 def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> None:
     avg_num_agreement_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     non_cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
 
     for method in ['random', 'ts_uniform', 'ts_informed']:
@@ -257,19 +262,19 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
 
 def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: int) -> None:
     avg_num_agreement_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     non_cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
 
     for method in ['random', 'ts']:
@@ -444,12 +449,11 @@ def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('-output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
-    parser.add_argument('-fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
-    parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
+    parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
+    parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
+    parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)

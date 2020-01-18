@@ -137,10 +137,17 @@ def _get_ground_truth(categories: List[int], observations: List[bool], confidenc
         metric_val = _get_accuracy_k(categories, observations, num_classes)
     elif metric == 'calibration_error':
         metric_val = _get_ece_k(categories, observations, confidences, num_classes, num_bins=10)
+
+    output = np.zeros((num_classes,), dtype=np.bool_)
+
     if mode == 'max':
-        return metric_val.argsort()[-topk:][::-1].flatten().tolist()
+        indices = metric_val.argsort()[-topk:]
     else:
-        return metric_val.argsort()[:topk].flatten().tolist()
+        indices = metric_val.argsort()[:topk]
+
+    output[indices] = 1
+
+    return output
 
 
 def random_sampling(deques: List[deque], topk: int = 1, **kwargs) -> int:
