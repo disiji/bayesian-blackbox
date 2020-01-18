@@ -55,11 +55,9 @@ def get_samples_topk(args: argparse.Namespace,
     for _deque in deques:
         random.shuffle(_deque)
 
-    sampled_categories = [None] * num_samples
-    sampled_scores = [None] * num_samples
-    sampled_observations = [None] * num_samples
-
-    idx = 0
+    sampled_categories = np.zeros((num_samples,), dtype=np.int)
+    sampled_observations = np.zeros((num_samples,), dtype=np.int)
+    sampled_scores = np.zeros((num_samples,), dtype=np.float)
 
     while (idx < num_samples):
         # sampling process:
@@ -92,8 +90,6 @@ def get_samples_topk(args: argparse.Namespace,
 
             sampled_categories[idx] = category
             sampled_observations[idx] = observation
-
-            idx += 1
 
     # write sampled_categories, sampled_observations, sampled_scores to file
     dir = args.output / experiment_name
