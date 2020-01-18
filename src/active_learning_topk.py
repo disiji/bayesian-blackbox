@@ -72,6 +72,15 @@ def get_samples_topk(args: argparse.Namespace,
                                                          ttts_beta=0.5,
                                                          epsilon=0.1,
                                                          ucb_c=1, )
+
+        # COMMENT: @rloganiv - Two issues with the following block of code:
+        # 1. It is weird that categories list is not always a list. Instead of post-processing
+        # here, it is preferable to have the output of all of the SAMPLE_CATEGORY functions
+        # be a list.
+        # 2. Overriding args.topk is really dangerous here - it will be set to 1 for all subsequent
+        # functions (e.g., during evaluation), and furthermore people using your code will have no
+        # idea this has happened. If args.topk > 1 is not a valid choice for certain sample methods
+        # then you should raise an Error early on.
         if type(categories_list) != list:
             categories_list = [categories_list]
             if args.topk != 1:
