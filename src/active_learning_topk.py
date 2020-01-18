@@ -149,19 +149,12 @@ def eval(args: argparse.Namespace,
 
     elif metric == 'calibration_error':
         model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
-<<<<<<< HEAD
 
     avg_num_agreement = np.zeros((num_samples,))
     cumulative_metric = np.zeros((num_samples,))
     non_cumulative_metric = np.zeros((num_samples,))
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
-=======
-
-    avg_num_agreement = np.zeros((num_samples,))
-    cumulative_metric = np.zeros((num_samples,))
-    non_cumulative_metric = np.zeros((num_samples,))
->>>>>>> origin/master
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
