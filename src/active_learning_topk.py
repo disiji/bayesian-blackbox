@@ -1,5 +1,4 @@
 import argparse
-import copy
 import logging
 import os
 import pathlib
@@ -43,9 +42,9 @@ def get_samples_topk(args: argparse.Namespace,
     random.seed(random_seed)
 
     if metric == 'accuracy':
-        model = copy.deepcopy(BetaBernoulli(num_classes, prior))
+        model = BetaBernoulli(num_classes, prior)
     elif metric == 'calibration_error':
-        model = copy.deepcopy(ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None))
+        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
     deques = [deque() for _ in range(num_classes)]
     for (category, score, observation) in zip(categories, confidences, observations):
@@ -143,14 +142,14 @@ def eval(args: argparse.Namespace,
     num_samples = len(categories)
 
     if metric == 'accuracy':
-        model = copy.deepcopy(BetaBernoulli(num_classes, prior))
+        model = BetaBernoulli(num_classes, prior)
 
     elif metric == 'calibration_error':
-        model = copy.deepcopy(ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None))
+        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
-    avg_num_agreement = copy.deepcopy(np.zeros((num_samples,)))
-    cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
-    non_cumulative_metric = copy.deepcopy(np.zeros((num_samples,)))
+    avg_num_agreement = np.zeros((num_samples,))
+    cumulative_metric = np.zeros((num_samples,))
+    non_cumulative_metric = np.zeros((num_samples,))
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
@@ -208,19 +207,19 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], figname: str, ylab
 
 def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> None:
     avg_num_agreement_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     non_cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
 
     for method in ['random', 'ts_uniform', 'ts_informed']:
@@ -257,19 +256,19 @@ def comparison_plot_accuracy(args: argparse.Namespace, MODE: str, N: int) -> Non
 
 def comparison_plot_calibration_error(args: argparse.Namespace, MODE: str, N: int) -> None:
     avg_num_agreement_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
     non_cumulative_metric_dict = {
-        'random': copy.deepcopy(np.zeros((N,))),
-        'ts_uniform': copy.deepcopy(np.zeros((N,))),
-        'ts_informed': copy.deepcopy(np.zeros((N,))),
+        'random': np.zeros((N,)),
+        'ts_uniform': np.zeros((N,)),
+        'ts_informed': np.zeros((N,)),
     }
 
     for method in ['random', 'ts']:
