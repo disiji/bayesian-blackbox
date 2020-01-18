@@ -59,19 +59,19 @@ def get_samples_topk(args: argparse.Namespace,
     sampled_observations = np.zeros((num_samples,), dtype=np.int)
     sampled_scores = np.zeros((num_samples,), dtype=np.float)
 
-    while (idx < num_samples):
+    for idx in range(num_samples):
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
-        categories_list = SAMPLE_CATEGORY[sample_method].__call__(deques=deques,
-                                                                  random_seed=random_seed,
-                                                                  model=model,
-                                                                  mode=mode,
-                                                                  topk=args.topk,
-                                                                  max_ttts_trial=50,
-                                                                  ttts_beta=0.5,
-                                                                  epsilon=0.1,
-                                                                  ucb_c=1, )
+        categories_list = SAMPLE_CATEGORY[sample_method](deques=deques,
+                                                         random_seed=random_seed,
+                                                         model=model,
+                                                         mode=mode,
+                                                         topk=args.topk,
+                                                         max_ttts_trial=50,
+                                                         ttts_beta=0.5,
+                                                         epsilon=0.1,
+                                                         ucb_c=1, )
         if type(categories_list) != list:
             categories_list = [categories_list]
             if args.topk != 1:
