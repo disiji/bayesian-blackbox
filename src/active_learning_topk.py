@@ -153,7 +153,7 @@ def eval(args: argparse.Namespace,
             topk_arms[indices] = 1
 
             # evaluation
-            avg_num_agreement[idx // LOG_FREQ] = (topk_arms == ground_truth).mean()
+            avg_num_agreement[idx // LOG_FREQ] = np.logical_and(topk_arms, ground_truth).mean()
             # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
