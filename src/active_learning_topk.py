@@ -56,6 +56,8 @@ def get_samples_topk(args: argparse.Namespace,
 
     idx = 0
 
+    topk = args.topk
+
     while idx < num_samples:
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
@@ -64,16 +66,15 @@ def get_samples_topk(args: argparse.Namespace,
                                                                   random_seed=random_seed,
                                                                   model=model,
                                                                   mode=args.mode,
-                                                                  topk=args.topk,
+                                                                  topk=topk,
                                                                   max_ttts_trial=50,
                                                                   ttts_beta=0.5,
                                                                   epsilon=0.1,
                                                                   ucb_c=1, )
         if type(categories_list) != list:
             categories_list = [categories_list]
-            if args.topk != 1:
-                print("setting topk to 1 at step %d" % idx)
-                args.topk = 1
+            if topk != 1:
+                topk = 1
 
         # update model, deques, thetas, choices
         for category in categories_list:
@@ -177,12 +178,14 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], figname: str, ylab
 
 
 def comparison_plot(args: argparse.Namespace,
+                    experiment_name: str,
                     avg_num_agreement_dict: Dict[str, np.ndarray],
                     cumulative_metric_dict: Dict[str, np.ndarray],
                     non_cumulative_metric_dict: Dict[str, np.ndarray]) -> None:
     """
 
     :param args:
+    :param experiment_name:
     :param avg_num_agreement_dict:
         Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ)
     :param cumulative_metric_dict:
@@ -202,8 +205,6 @@ def comparison_plot(args: argparse.Namespace,
         avg_num_agreement_dict[method] = avg_num_agreement_dict[method].mean(axis=0)
         cumulative_metric_dict[method] = cumulative_metric_dict[method].mean(axis=0)
         non_cumulative_metric_dict[method] = non_cumulative_metric_dict[method].mean(axis=0)
-
-    experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
 
     _comparison_plot(avg_num_agreement_dict,
                      args.output / experiment_name / "avg_num_agreement.pdf",
@@ -360,7 +361,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
 
     if PLOT:
-        comparison_plot(args, avg_num_agreement_dict, cumulative_metric_dict, non_cumulative_metric_dict)
+        comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
+                        non_cumulative_metric_dict)
 
 
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -477,7 +479,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
 
     if PLOT:
-        comparison_plot(args, avg_num_agreement_dict, cumulative_metric_dict, non_cumulative_metric_dict)
+        comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
+                        non_cumulative_metric_dict)
 
 
 if __name__ == "__main__":
