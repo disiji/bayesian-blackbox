@@ -1,7 +1,5 @@
-# Standard library imports
 import warnings
 
-import betacal
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.cluster.vq
@@ -417,83 +415,6 @@ class IsotonicRegression(CalibrationMethod):
         elif np.shape(X)[1] == 2:
             check_is_fitted(self, "isotonic_regressor_")
             p1 = self.isotonic_regressor_.predict(X[:, 1])
-            return np.column_stack([1 - p1, p1])
-        elif np.shape(X)[1] > 2:
-            check_is_fitted(self, "onevsrest_calibrator_")
-            return self.onevsrest_calibrator_.predict_proba(X)
-
-
-class BetaCalibration(CalibrationMethod):
-    """
-    Probability calibration using Beta calibration
-    Beta calibration [1]_ [2]_ is a parametric approach to calibration, specifically designed for probabilistic
-    classifiers with output range [0,1]. Here, a calibration map family is defined based on the likelihood ratio between
-    two Beta distributions. This parametric assumption is appropriate if the marginal class distributions follow Beta
-    distributions. The beta calibration map has three parameters, two shape parameters `a` and `b` and one location
-    parameter `m`.
-    Parameters
-    ----------
-        params : str, default="abm"
-            Defines which parameters to fit and which to hold constant. One of ['abm', 'ab', 'am'].
-    References
-    ----------
-    .. [1] Kull, M., Silva Filho, T. M., Flach, P., et al. Beyond sigmoids: How to obtain well-calibrated probabilities
-           from binary classifiers with beta calibration. Electronic Journal of Statistics 11, 5052–5080 (2017)
-    .. [2] Kull, M., Filho, T. S. & Flach, P. Beta calibration: a well-founded and easily implemented improvement on
-           logistic calibration for binary classifiers in Proceedings of the 20th International Conference on Artificial
-           Intelligence and Statistics (AISTATS)
-    """
-
-    def __init__(self, params="abm"):
-        super().__init__()
-        self.params = params
-
-    def fit(self, X, y, n_jobs=None):
-        """
-        Fit the calibration method based on the given uncalibrated class probabilities X and ground truth labels y.
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_classes)
-            Training data, i.e. predicted probabilities of the base classifier on the calibration set.
-        y : array-like, shape (n_samples,)
-            Target classes.
-        n_jobs : int or None, optional (default=None)
-            The number of jobs to use for the computation.
-            ``None`` means 1 unless in a :obj:`joblib.parallel_backend` context.
-            ``-1`` means using all processors. See :term:`Glossary <n_jobs>` for more details.
-        Returns
-        -------
-        self : object
-            Returns an instance of self.
-        """
-        if X.ndim == 1:
-            raise ValueError("Calibration training data must have shape (n_samples, n_classes).")
-        elif np.shape(X)[1] == 2:
-            self.beta_calibrator_ = betacal.BetaCalibration(self.params)
-            self.beta_calibrator_.fit(X[:, 1].reshape(-1, 1), y)
-        elif np.shape(X)[1] > 2:
-            self.onevsrest_calibrator_ = OneVsRestCalibrator(calibrator=clone(self), n_jobs=n_jobs)
-            self.onevsrest_calibrator_.fit(X, y)
-        return self
-
-    def predict_proba(self, X):
-        """
-        Compute calibrated posterior probabilities for a given array of posterior probabilities from an arbitrary
-        classifier.
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_classes)
-            The uncalibrated posterior probabilities.
-        Returns
-        -------
-        P : array, shape (n_samples, n_classes)
-            The predicted probabilities.
-        """
-        if X.ndim == 1:
-            raise ValueError("Calibration data must have shape (n_samples, n_classes).")
-        elif np.shape(X)[1] == 2:
-            check_is_fitted(self, "beta_calibrator_")
-            p1 = self.beta_calibrator_.predict(X[:, 1].reshape(-1, 1))
             return np.column_stack([1 - p1, p1])
         elif np.shape(X)[1] > 2:
             check_is_fitted(self, "onevsrest_calibrator_")
