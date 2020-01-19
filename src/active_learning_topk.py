@@ -18,7 +18,7 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
-RUNS = 10
+RUNS = 100
 LOG_FREQ = 10
 
 
@@ -72,6 +72,7 @@ def get_samples_topk(args: argparse.Namespace,
         if type(categories_list) != list:
             categories_list = [categories_list]
             if args.topk != 1:
+                print("setting topk to 1 at step %d" % idx)
                 args.topk = 1
 
         # update model, deques, thetas, choices
@@ -124,7 +125,7 @@ def eval(args: argparse.Namespace,
     if args.metric == 'accuracy':
         model = BetaBernoulli(num_classes, prior)
     elif args.metric == 'calibration_error':
-        args.model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
+        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
     avg_num_agreement = np.zeros((num_samples // LOG_FREQ,))
     cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
@@ -188,7 +189,12 @@ def comparison_plot(args: argparse.Namespace,
     """
 
     # avg over runs
-    for method in ['random', 'ts_uniform', 'ts_informed']:
+    if args.metric == 'accuracy':
+        method_list = ['random', 'ts_uniform', 'ts_informed']
+    elif args.metric == 'calibration_error':
+        method_list = ['random', 'ts']
+
+    for method in method_list:
         avg_num_agreement_dict[method] = avg_num_agreement_dict[method].mean(axis=0)
         cumulative_metric_dict[method] = cumulative_metric_dict[method].mean(axis=0)
         non_cumulative_metric_dict[method] = non_cumulative_metric_dict[method].mean(axis=0)
@@ -477,6 +483,6 @@ if __name__ == "__main__":
 
     print(args.dataset, args.mode, '...')
     if args.metric == 'accuracy':
-        main_accuracy_topk(args, SAMPLE=False, EVAL=False, PLOT=True)
+        main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=False, EVAL=False, PLOT=True)
