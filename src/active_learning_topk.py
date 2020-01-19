@@ -5,6 +5,7 @@ import pathlib
 import pickle
 import random
 from collections import deque
+from multiprocessing import Process, JoinableQueue
 from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
@@ -58,20 +59,21 @@ def get_samples_topk(args: argparse.Namespace,
     sampled_categories = np.zeros((num_samples,), dtype=np.int)
     sampled_observations = np.zeros((num_samples,), dtype=np.int)
     sampled_scores = np.zeros((num_samples,), dtype=np.float)
+    sample_fct = SAMPLE_CATEGORY[sample_method]
 
     for idx in range(num_samples):
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
-        categories_list = SAMPLE_CATEGORY[sample_method](deques=deques,
-                                                         random_seed=random_seed,
-                                                         model=model,
-                                                         mode=mode,
-                                                         topk=args.topk,
-                                                         max_ttts_trial=50,
-                                                         ttts_beta=0.5,
-                                                         epsilon=0.1,
-                                                         ucb_c=1, )
+        categories_list = sample_fct(deques=deques,
+                                     random_seed=random_seed,
+                                     model=model,
+                                     mode=mode,
+                                     topk=args.topk,
+                                     max_ttts_trial=50,
+                                     ttts_beta=0.5,
+                                     epsilon=0.1,
+                                     ucb_c=1, )
 
         # COMMENT: @rloganiv - Two issues with the following block of code:
         # 1. It is weird that categories list is not always a list. Instead of post-processing
@@ -411,34 +413,83 @@ def main_calibration_error_topk(args: argparse.Namespace, MODE: str, SAMPLE=True
     N = len(observations)
 
     if SAMPLE:
-        for r in tqdm(range(RUNS)):
-            get_samples_topk(args,
-                             categories,
-                             observations,
-                             confidences,
-                             NUM_CLASSES,
-                             N,
-                             experiment_name=args.dataset + '_ece_random_run_idx_' + str(r),
-                             sample_method='random',
-                             mode=MODE,
-                             metric='calibration_error',
-                             prior=None,
-                             random_seed=r)
+        logging.info('Starting sampling')
 
-            get_samples_topk(args,
-                             categories,
-                             observations,
-                             confidences,
-                             NUM_CLASSES,
-                             N,
-                             experiment_name=args.dataset + '_ece_ts_run_idx_' + str(r),
-                             sample_method='ts',
-                             mode=MODE,
-                             metric='calibration_error',
-                             prior=None,
-                             random_seed=r)
+        # COMMENT: @rloganiv - I think the only way to speed up sampling is to use multiple
+        # processes, so that runs can be done in parallel. The code below is a lazy attempt at
+        # doing so.
+        def random_worker(queue):
+            # Continue to work until queue is empty
+            while not queue.empty():
+                # Get a job (e.g. run index)
+                run_idx = queue.get()
+                experiment_name = args.dataset + '_ece_random_run_idx_'+ str(run_idx)
+                get_samples_topk(args,
+                                 categories,
+                                 observations,
+                                 confidences,
+                                 NUM_CLASSES,
+                                 N,
+                                 sample_method='random',
+                                 mode=MODE,
+                                 metric='calibration_error',
+                                 prior=None,
+                                 # Arguments that change across runs below.
+                                 random_seed=run_idx,
+                                 experiment_name=experiment_name)
+                queue.task_done()
+
+        def ts_worker(queue):
+            # Continue to work until queue is empty
+            while not queue.empty():
+                # Get a job (e.g. run index)
+                run_idx = queue.get()
+                experiment_name = args.dataset + '_ece_ts_run_idx_'+ str(run_idx)
+                get_samples_topk(args,
+                                 categories,
+                                 observations,
+                                 confidences,
+                                 NUM_CLASSES,
+                                 N,
+                                 sample_method='ts',
+                                 mode=MODE,
+                                 metric='calibration_error',
+                                 prior=None,
+                                 # Arguments that change across runs below.
+                                 random_seed=run_idx,
+                                 experiment_name=experiment_name)
+                queue.task_done()
+
+        # Enqueue tasks
+        logging.info('Enqueueing tasks')
+        random_job_queue = JoinableQueue()
+        ts_job_queue = JoinableQueue()
+        for i in range(RUNS):
+            random_job_queue.put(i)
+            ts_job_queue.put(i)
+
+        # Start random workers
+        logging.info('Running random sampling')
+        processes = []
+        for j in range(args.sample_processes):
+            process = Process(target=random_worker, args=(random_job_queue,))
+            process.start()
+
+        # Make sure all random workers are done before proceeding
+        random_job_queue.join()
+
+        # Start ts workers
+        logging.info('Running Thompson sampling')
+        processes = []
+        for j in range(args.sample_processes):
+            process = Process(target=ts_worker, args=(ts_job_queue,))
+            process.start()
+
+        # Make sure all ts workers are done before proceeding
+        ts_job_queue.join()
 
     if EVAL:
+        logging.info('Starting evaluation')
         for r in tqdm(range(RUNS)):
             eval(
                 args,
@@ -467,6 +518,7 @@ if __name__ == "__main__":
     parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
     parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
     parser.add_argument('--evaluation_freq', type=int,  default=1, help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
+    parser.add_argument('--sample_processes', type=int, default=1, help='Number of sample processes. Increase to speed up sampling.')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)
