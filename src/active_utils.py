@@ -123,7 +123,7 @@ def _get_ece_k(categories: List[int], observations: List[bool], confidences: Lis
 
 
 def _get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
-                      metric: str, mode: str, topk: int = 1) -> int:
+                      metric: str, mode: str, topk: int = 1) -> np.ndarray:
     """
     Compute ground truth given metric and mode with all data points.
     :param categories:
@@ -131,7 +131,7 @@ def _get_ground_truth(categories: List[int], observations: List[bool], confidenc
     :param confidences:
     :param metric:
     :param mode:
-    :return:
+    :return: binary np.ndarray of shape (num_classes, ) indicating each class in top k or not.
     """
     if metric == 'accuracy':
         metric_val = _get_accuracy_k(categories, observations, num_classes)

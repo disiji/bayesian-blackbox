@@ -98,6 +98,7 @@ def eval(args: argparse.Namespace,
          categories: List[int],
          observations: List[bool],
          confidences: List[float],
+         ground_truth: np.ndarray,
          num_classes: int,
          prior=None,
          weight=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -107,9 +108,11 @@ def eval(args: argparse.Namespace,
     :param categories:
     :param observations:
     :param confidences:
+    :param ground_truth:
     :param num_classes:
     :param prior:
     :param weight:
+
     :return avg_num_agreement: (num_samples, ) array.
             Average number of agreement between selected topk and ground truth topk at each step.
     :return cumulative_metric: (num_samples, ) array.
@@ -117,9 +120,6 @@ def eval(args: argparse.Namespace,
     :return non_cumulative_metric: (num_samples, ) array.
             Average metric (accuracy or ece) evaluated with model.eval of the selected topk arms at each step.
     """
-
-    ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
-                                     topk=args.topk)
     num_samples = len(categories)
 
     if args.metric == 'accuracy':
@@ -131,6 +131,8 @@ def eval(args: argparse.Namespace,
     cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
     non_cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
 
+    topk_arms = np.zeros((num_classes,), dtype=np.bool_)
+
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
         if args.metric == 'accuracy':
@@ -141,14 +143,16 @@ def eval(args: argparse.Namespace,
 
         if idx % LOG_FREQ == 0:
             # select TOPK arms
+            topk_arms[:] = 0
             metric_val = model.eval
             if args.mode == 'min':
-                topk_arms = metric_val.argsort()[:args.topk].flatten().tolist()
+                indices = metric_val.argsort()[:args.topk]
             elif args.mode == 'max':
-                topk_arms = metric_val.argsort()[-args.topk:][::-1].flatten().tolist()
+                indices = metric_val.argsort()[-args.topk:]
+            topk_arms[indices] = 1
 
             # evaluation
-            avg_num_agreement[idx // LOG_FREQ] = len([_ for _ in topk_arms if _ in ground_truth]) * 1.0 / args.topk
+            avg_num_agreement[idx // LOG_FREQ] = (topk_arms == ground_truth).mean()
             # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
@@ -309,12 +313,15 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
 
     if EVAL:
+        ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                         topk=args.topk)
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['random'][r], cumulative_metric_dict['random'][r], \
             non_cumulative_metric_dict['random'][r] = eval(args,
                                                            sampled_categories_dict['random'][r].tolist(),
                                                            sampled_observations_dict['random'][r].tolist(),
                                                            sampled_scores_dict['random'][r].tolist(),
+                                                           ground_truth,
                                                            num_classes=num_classes,
                                                            prior=UNIFORM_PRIOR)
 
@@ -323,6 +330,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                sampled_categories_dict['ts_uniform'][r].tolist(),
                                                                sampled_observations_dict['ts_uniform'][r].tolist(),
                                                                sampled_scores_dict['ts_uniform'][r].tolist(),
+                                                               ground_truth,
                                                                num_classes=num_classes,
                                                                prior=UNIFORM_PRIOR)
 
@@ -331,6 +339,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                 sampled_categories_dict['ts_informed'][r].tolist(),
                                                                 sampled_observations_dict['ts_informed'][r].tolist(),
                                                                 sampled_scores_dict['ts_informed'][r].tolist(),
+                                                                ground_truth,
                                                                 num_classes=num_classes,
                                                                 prior=INFORMED_PRIOR)
 
@@ -430,12 +439,15 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
 
     if EVAL:
+        ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                         topk=args.topk)
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['random'][r], cumulative_metric_dict['random'][r], \
             non_cumulative_metric_dict['random'][r] = eval(args,
                                                            sampled_categories_dict['random'][r].tolist(),
                                                            sampled_observations_dict['random'][r].tolist(),
                                                            sampled_scores_dict['random'][r].tolist(),
+                                                           ground_truth,
                                                            num_classes=num_classes,
                                                            prior=None)
 
@@ -444,6 +456,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                        sampled_categories_dict['ts'][r].tolist(),
                                                        sampled_observations_dict['ts'][r].tolist(),
                                                        sampled_scores_dict['ts'][r].tolist(),
+                                                       ground_truth,
                                                        num_classes=num_classes,
                                                        prior=None)
 
