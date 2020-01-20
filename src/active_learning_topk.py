@@ -7,7 +7,7 @@ from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, _get_ground_truth
+from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
@@ -20,7 +20,7 @@ FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
 RUNS = 100
 LOG_FREQ = 10
-
+PRIOR_STRENGTH = 5
 
 def get_samples_topk(args: argparse.Namespace,
                      categories: List[int],
@@ -151,9 +151,8 @@ def eval(args: argparse.Namespace,
             elif args.mode == 'max':
                 indices = metric_val.argsort()[-args.topk:]
             topk_arms[indices] = 1
-
             # evaluation
-            avg_num_agreement[idx // LOG_FREQ] = np.logical_and(topk_arms, ground_truth).mean()
+            avg_num_agreement[idx // LOG_FREQ] = topk_arms[ground_truth==1].mean()
             # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
@@ -197,9 +196,9 @@ def comparison_plot(args: argparse.Namespace,
 
     # avg over runs
     if args.metric == 'accuracy':
-        method_list = ['random', 'ts_uniform', 'ts_informed']
+        method_list = ['non-active', 'ts_uniform', 'ts_informed']
     elif args.metric == 'calibration_error':
-        method_list = ['random', 'ts']
+        method_list = ['non-active', 'ts']
 
     for method in method_list:
         avg_num_agreement_dict[method] = avg_num_agreement_dict[method].mean(axis=0)
@@ -222,10 +221,10 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
     num_samples = len(observations)
-    confidence = _get_confidence_k(categories, confidences, num_classes)
 
-    UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2
-    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T
+    UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * PRIOR_STRENGTH
+    confidence = _get_confidence_k(categories, confidences, num_classes)
+    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * PRIOR_STRENGTH
 
     experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
 
@@ -233,40 +232,40 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         (args.output / experiment_name).mkdir()
 
     sampled_categories_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=int),
+        'non-active': np.empty((RUNS, num_samples), dtype=int),
         'ts_uniform': np.empty((RUNS, num_samples), dtype=int),
         'ts_informed': np.empty((RUNS, num_samples), dtype=int),
     }
     sampled_observations_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=bool),
+        'non-active': np.empty((RUNS, num_samples), dtype=bool),
         'ts_uniform': np.empty((RUNS, num_samples), dtype=bool),
         'ts_informed': np.empty((RUNS, num_samples), dtype=bool),
     }
     sampled_scores_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=float),
+        'non-active': np.empty((RUNS, num_samples), dtype=float),
         'ts_uniform': np.empty((RUNS, num_samples), dtype=float),
         'ts_informed': np.empty((RUNS, num_samples), dtype=float),
     }
 
     avg_num_agreement_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
     cumulative_metric_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
     non_cumulative_metric_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
 
     if SAMPLE:
         for r in tqdm(range(RUNS)):
-            sampled_categories_dict['random'][r], sampled_observations_dict['random'][r], sampled_scores_dict['random'][
+            sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], sampled_scores_dict['non-active'][
                 r] = get_samples_topk(args,
                                       categories,
                                       observations,
@@ -298,7 +297,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                      prior=INFORMED_PRIOR,
                                                                      random_seed=r)
         # write samples to file
-        for method in ['random', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active', 'ts_uniform', 'ts_informed']:
             np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
                     sampled_categories_dict[method])
             np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
@@ -306,7 +305,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method), sampled_scores_dict[method])
     else:
         # load sampled categories, scores and observations from file
-        for method in ['random', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active', 'ts_uniform', 'ts_informed']:
             sampled_categories_dict[method] = np.load(
                 args.output / experiment_name / ('sampled_categories_%s.npy' % method))
             sampled_observations_dict[method] = np.load(
@@ -314,14 +313,14 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
 
     if EVAL:
-        ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
-                                         topk=args.topk)
+        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                        topk=args.topk)
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['random'][r], cumulative_metric_dict['random'][r], \
-            non_cumulative_metric_dict['random'][r] = eval(args,
-                                                           sampled_categories_dict['random'][r].tolist(),
-                                                           sampled_observations_dict['random'][r].tolist(),
-                                                           sampled_scores_dict['random'][r].tolist(),
+            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
+            non_cumulative_metric_dict['non-active'][r] = eval(args,
+                                                           sampled_categories_dict['non-active'][r].tolist(),
+                                                           sampled_observations_dict['non-active'][r].tolist(),
+                                                           sampled_scores_dict['non-active'][r].tolist(),
                                                            ground_truth,
                                                            num_classes=num_classes,
                                                            prior=UNIFORM_PRIOR)
@@ -344,7 +343,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                 num_classes=num_classes,
                                                                 prior=INFORMED_PRIOR)
 
-        for method in ['random', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active', 'ts_uniform', 'ts_informed']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
@@ -352,7 +351,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
                     non_cumulative_metric_dict[method])
     else:
-        for method in ['random', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active', 'ts_uniform', 'ts_informed']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             cumulative_metric_dict[method] = np.load(
@@ -377,34 +376,34 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         (args.output / experiment_name).mkdir()
 
     sampled_categories_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=int),
+        'non-active': np.empty((RUNS, num_samples), dtype=int),
         'ts': np.empty((RUNS, num_samples), dtype=int),
     }
     sampled_observations_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=bool),
+        'non-active': np.empty((RUNS, num_samples), dtype=bool),
         'ts': np.empty((RUNS, num_samples), dtype=bool),
     }
     sampled_scores_dict = {
-        'random': np.empty((RUNS, num_samples), dtype=float),
+        'non-active': np.empty((RUNS, num_samples), dtype=float),
         'ts': np.empty((RUNS, num_samples), dtype=float),
     }
 
     avg_num_agreement_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
     cumulative_metric_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
     non_cumulative_metric_dict = {
-        'random': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
     }
 
     if SAMPLE:
         for r in tqdm(range(RUNS)):
-            sampled_categories_dict['random'][r], sampled_observations_dict['random'][r], sampled_scores_dict['random'][
+            sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], sampled_scores_dict['non-active'][
                 r] = get_samples_topk(args,
                                       categories,
                                       observations,
@@ -425,7 +424,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                             prior=None,
                                                             random_seed=r)
         # write samples to file
-        for method in ['random', 'ts']:
+        for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
                     sampled_categories_dict[method])
             np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
@@ -433,7 +432,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method), sampled_scores_dict[method])
     else:
         # load sampled categories, scores and observations from file
-        for method in ['random', 'ts']:
+        for method in ['non-active', 'ts']:
             sampled_categories_dict[method] = np.load(
                 args.output / experiment_name / ('sampled_categories_%s.npy' % method))
             sampled_observations_dict[method] = np.load(
@@ -441,14 +440,14 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
 
     if EVAL:
-        ground_truth = _get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
-                                         topk=args.topk)
+        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                        topk=args.topk)
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['random'][r], cumulative_metric_dict['random'][r], \
-            non_cumulative_metric_dict['random'][r] = eval(args,
-                                                           sampled_categories_dict['random'][r].tolist(),
-                                                           sampled_observations_dict['random'][r].tolist(),
-                                                           sampled_scores_dict['random'][r].tolist(),
+            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
+            non_cumulative_metric_dict['non-active'][r] = eval(args,
+                                                           sampled_categories_dict['non-active'][r].tolist(),
+                                                           sampled_observations_dict['non-active'][r].tolist(),
+                                                           sampled_scores_dict['non-active'][r].tolist(),
                                                            ground_truth,
                                                            num_classes=num_classes,
                                                            prior=None)
@@ -462,7 +461,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                        num_classes=num_classes,
                                                        prior=None)
 
-        for method in ['random', 'ts']:
+        for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
@@ -470,7 +469,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
                     non_cumulative_metric_dict[method])
     else:
-        for method in ['random', 'ts']:
+        for method in ['non-active', 'ts']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             cumulative_metric_dict[method] = np.load(
@@ -489,8 +488,8 @@ if __name__ == "__main__":
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
     parser.add_argument('-output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
     parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
-    parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
     parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
+    parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
     args, _ = parser.parse_known_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -501,4 +500,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=False, EVAL=False, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)

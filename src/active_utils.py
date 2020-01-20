@@ -122,8 +122,8 @@ def _get_ece_k(categories: List[int], observations: List[bool], confidences: Lis
     return ece_k
 
 
-def _get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
-                      metric: str, mode: str, topk: int = 1) -> np.ndarray:
+def get_ground_truth(categories: List[int], observations: List[bool], confidences: List[float], num_classes: int,
+                     metric: str, mode: str, topk: int = 1) -> np.ndarray:
     """
     Compute ground truth given metric and mode with all data points.
     :param categories:
