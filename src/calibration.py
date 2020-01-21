@@ -720,5 +720,5 @@ CALIBRATION_MODELS = {
     'platt_scaling': PlattScaling,
     'isotonic_regression': IsotonicRegression,
     'histogram_binning': HistogramBinning,
-    'bayesian_binning_quantiles': BayesianBinningQuantiles.
+    'bayesian_binning_quantiles': BayesianBinningQuantiles
 }

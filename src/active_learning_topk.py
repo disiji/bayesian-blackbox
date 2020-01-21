@@ -8,10 +8,11 @@ from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth
+from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST, prepare_data, train_holdout_split
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
+from calibration import CALIBRATION_MODELS
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -19,9 +20,11 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
-RUNS = 100
+RUNS = 5
 LOG_FREQ = 10
+CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
+CALIBRATION_MODEL = 'histogram_binning'
 
 
 def get_samples_topk(args: argparse.Namespace,
@@ -60,7 +63,7 @@ def get_samples_topk(args: argparse.Namespace,
     topk = args.topk
     idx = 0
 
-    while idx < num_samples:
+    while idx < args.sample_processes:
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
@@ -104,8 +107,11 @@ def eval(args: argparse.Namespace,
          confidences: List[float],
          ground_truth: np.ndarray,
          num_classes: int,
+         holdout_categories: List[int] = None,  # will be used if train classwise calibration model
+         holdout_observations: List[bool] = None,
+         holdout_confidences: List[float] = None,
          prior=None,
-         weight=None) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+         weight=None) -> Tuple[np.ndarray, ...]:
     """
 
     :param args:
@@ -114,9 +120,11 @@ def eval(args: argparse.Namespace,
     :param confidences:
     :param ground_truth:
     :param num_classes:
+    :param holdout_categories:
+    :param holdout_observations:
+    :param holdout_confidences:
     :param prior:
     :param weight:
-
     :return avg_num_agreement: (num_samples, ) array.
             Average number of agreement between selected topk and ground truth topk at each step.
     :return cumulative_metric: (num_samples, ) array.
@@ -124,6 +132,7 @@ def eval(args: argparse.Namespace,
     :return non_cumulative_metric: (num_samples, ) array.
             Average metric (accuracy or ece) evaluated with model.eval of the selected topk arms at each step.
     """
+
     num_samples = len(categories)
 
     if args.metric == 'accuracy':
@@ -134,6 +143,9 @@ def eval(args: argparse.Namespace,
     avg_num_agreement = np.zeros((num_samples // LOG_FREQ,))
     cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
     non_cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
+
+    if args.metric == 'calibration_error':
+        holdout_calibrated_ece = np.zeros((num_samples // CALIBRATION_FREQ,))
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
 
@@ -160,7 +172,27 @@ def eval(args: argparse.Namespace,
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
 
-    return avg_num_agreement, cumulative_metric, non_cumulative_metric
+        # todo: need to debug
+        if idx % CALIBRATION_FREQ == 0:
+            # before calibration
+            if idx == 0:
+                holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
+            else:
+                calibration_model = CALIBRATION_MODELS[args.calibration_model]()
+                X = np.array(confidences[:idx])
+                X = np.array([1 - X, X]).T
+                y = np.array(observations[:idx]) * 1.0
+                calibration_model.fit(X, y)
+                holdout_confidences = np.array(holdout_confidences)
+                holdout_confidences = np.array([1 - holdout_confidences, holdout_confidences]).T
+                calibrated_holdout_confidences = calibration_model.predict_proba(holdout_confidences)[:, 1].tolist()
+                holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
+                                                                           holdout_observations, num_bins=10)
+
+    if args.metric == 'accuracy':
+        return avg_num_agreement, cumulative_metric, non_cumulative_metric
+    elif args.metric == 'calibration_error':
+        return avg_num_agreement, cumulative_metric, non_cumulative_metric, holdout_calibrated_ece
 
 
 def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], figname: str, ylabel: str) -> None:
@@ -183,7 +215,8 @@ def comparison_plot(args: argparse.Namespace,
                     experiment_name: str,
                     avg_num_agreement_dict: Dict[str, np.ndarray],
                     cumulative_metric_dict: Dict[str, np.ndarray],
-                    non_cumulative_metric_dict: Dict[str, np.ndarray]) -> None:
+                    non_cumulative_metric_dict: Dict[str, np.ndarray],
+                    holdout_ece_dict: Dict[str, np.ndarray] = None) -> None:
     """
 
     :param args:
@@ -217,6 +250,10 @@ def comparison_plot(args: argparse.Namespace,
     _comparison_plot(non_cumulative_metric_dict,
                      args.output / experiment_name / "non_cumulative.pdf",
                      ('Non cumulative %s' % args.metric))
+    if holdout_ece_dict:
+        _comparison_plot(holdout_ece_dict,
+                         args.output / experiment_name / "holdout_ece.pdf",
+                         ('ECE %s' % args.metric))
 
 
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -372,14 +409,11 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
-
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
-
     categories, observations, confidences, holdout_categories, holdout_observations, holdout_confidences = train_holdout_split(
         categories, observations, confidences,
         holdout_ratio=0.2)
 
-    print(len(categories), len(observations), len(confidences), len(holdout_categories), len(holdout_observations), len(holdout_confidences))
     num_samples = len(observations)
 
     experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
@@ -411,6 +445,11 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     non_cumulative_metric_dict = {
         'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
         'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+    }
+
+    holdout_ece_dict = {
+        'non-active': np.zeros((RUNS, num_samples // CALIBRATION_FREQ)),
+        'ts': np.zeros((RUNS, num_samples // CALIBRATION_FREQ)),
     }
 
     if SAMPLE:
@@ -485,22 +524,30 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                         topk=args.topk)
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
-            non_cumulative_metric_dict['non-active'][r] = eval(args,
-                                                               sampled_categories_dict['non-active'][r].tolist(),
-                                                               sampled_observations_dict['non-active'][r].tolist(),
-                                                               sampled_scores_dict['non-active'][r].tolist(),
-                                                               ground_truth,
-                                                               num_classes=num_classes,
-                                                               prior=None)
+            non_cumulative_metric_dict['non-active'][r], holdout_ece_dict['non-active'][r] = eval(args,
+                                                                                                  sampled_categories_dict[
+                                                                                                      'non-active'][
+                                                                                                      r].tolist(),
+                                                                                                  sampled_observations_dict[
+                                                                                                      'non-active'][
+                                                                                                      r].tolist(),
+                                                                                                  sampled_scores_dict[
+                                                                                                      'non-active'][
+                                                                                                      r].tolist(),
+                                                                                                  ground_truth,
+                                                                                                  num_classes=num_classes,
+                                                                                                  prior=None)
 
             avg_num_agreement_dict['ts'][r], cumulative_metric_dict['ts'][r], \
-            non_cumulative_metric_dict['ts'][r] = eval(args,
-                                                       sampled_categories_dict['ts'][r].tolist(),
-                                                       sampled_observations_dict['ts'][r].tolist(),
-                                                       sampled_scores_dict['ts'][r].tolist(),
-                                                       ground_truth,
-                                                       num_classes=num_classes,
-                                                       prior=None)
+            non_cumulative_metric_dict['ts'][r], holdout_ece_dict['ts'][r] = eval(args,
+                                                                                  sampled_categories_dict['ts'][
+                                                                                      r].tolist(),
+                                                                                  sampled_observations_dict['ts'][
+                                                                                      r].tolist(),
+                                                                                  sampled_scores_dict['ts'][r].tolist(),
+                                                                                  ground_truth,
+                                                                                  num_classes=num_classes,
+                                                                                  prior=None)
 
         for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
@@ -509,18 +556,22 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                     cumulative_metric_dict[method])
             np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
                     non_cumulative_metric_dict[method])
-        else:
-            for method in ['non-active', 'ts']:
-                avg_num_agreement_dict[method] = np.load(
-                    args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-            cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-            non_cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            np.save(args.output / experiment_name / ('holdout_ece_%s.npy' % method),
+                    holdout_ece_dict[method])
+    else:
+        for method in ['non-active', 'ts']:
+            avg_num_agreement_dict[method] = np.load(
+                args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
+        cumulative_metric_dict[method] = np.load(
+            args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+        non_cumulative_metric_dict[method] = np.load(
+            args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+        holdout_ece_dict[method] = np.load(
+            args.output / experiment_name / ('holdout_ece_%s.npy' % method))
 
-            if PLOT:
-                comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
-                                non_cumulative_metric_dict)
+    if PLOT:
+        comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
+                        non_cumulative_metric_dict, holdout_ece_dict)
 
 
 if __name__ == "__main__":
@@ -530,9 +581,9 @@ if __name__ == "__main__":
     parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
     parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
     parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
-    parser.add_argument('--evaluation_freq', type=int, default=1,
-                        help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
-    parser.add_argument('--sample_processes', type=int, default=1,
+    parser.add_argument('--calibration_model', type=str, default=CALIBRATION_MODEL,
+                        help='calibration models to apply on holdout data')
+    parser.add_argument('--sample_processes', type=int, default=2000,
                         help='Number of sample processes. Increase to speed up sampling.')
 
     args, _ = parser.parse_known_args()
