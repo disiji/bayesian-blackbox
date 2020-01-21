@@ -12,10 +12,10 @@ from typing import List, Dict, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
+from calibration import CALIBRATION_MODELS
 from data_utils import datafile_dict, num_classes_dict, DATASET_LIST, prepare_data, train_holdout_split
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
-from calibration import CALIBRATION_MODELS
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -23,7 +23,7 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
-RUNS = 5
+RUNS = 100
 LOG_FREQ = 10
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
@@ -66,7 +66,7 @@ def get_samples_topk(args: argparse.Namespace,
     topk = args.topk
     idx = 0
 
-    while idx < args.sample_processes:
+    while idx < num_samples:
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
@@ -143,14 +143,16 @@ def eval(args: argparse.Namespace,
     elif args.metric == 'calibration_error':
         model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
-    avg_num_agreement = np.zeros((num_samples // LOG_FREQ,))
-    cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
-    non_cumulative_metric = np.zeros((num_samples // LOG_FREQ,))
+    avg_num_agreement = np.zeros((num_samples // LOG_FREQ + 1,))
+    cumulative_metric = np.zeros((num_samples // LOG_FREQ + 1,))
+    non_cumulative_metric = np.zeros((num_samples // LOG_FREQ + 1,))
 
     if args.metric == 'calibration_error':
-        holdout_calibrated_ece = np.zeros((num_samples // CALIBRATION_FREQ,))
+        holdout_calibrated_ece = np.zeros((num_samples // CALIBRATION_FREQ + 1,))
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
+    holdout_X = np.array(holdout_confidences)
+    holdout_X = np.array([1 - holdout_X, holdout_X]).T
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
@@ -175,7 +177,6 @@ def eval(args: argparse.Namespace,
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
 
-        # todo: need to debug
         if idx % CALIBRATION_FREQ == 0:
             # before calibration
             if idx == 0:
@@ -185,10 +186,9 @@ def eval(args: argparse.Namespace,
                 X = np.array(confidences[:idx])
                 X = np.array([1 - X, X]).T
                 y = np.array(observations[:idx]) * 1.0
+
                 calibration_model.fit(X, y)
-                holdout_confidences = np.array(holdout_confidences)
-                holdout_confidences = np.array([1 - holdout_confidences, holdout_confidences]).T
-                calibrated_holdout_confidences = calibration_model.predict_proba(holdout_confidences)[:, 1].tolist()
+                calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)[:, 1].tolist()
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
 
@@ -198,12 +198,12 @@ def eval(args: argparse.Namespace,
         return avg_num_agreement, cumulative_metric, non_cumulative_metric, holdout_calibrated_ece
 
 
-def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], figname: str, ylabel: str) -> None:
+def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, figname: str, ylabel: str) -> None:
     # If labels are getting cut off make the figsize smaller
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
 
     for method_name, metric_eval in eval_result_dict.items():
-        x = np.arange(len(metric_eval)) * LOG_FREQ
+        x = np.arange(len(metric_eval)) * eval_freq
         plt.plot(x[1:], metric_eval[1:], label=method_name)
     plt.xlabel('#Queries')
     plt.ylabel(ylabel)
@@ -225,11 +225,11 @@ def comparison_plot(args: argparse.Namespace,
     :param args:
     :param experiment_name:
     :param avg_num_agreement_dict:
-        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ)
+        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ + 1)
     :param cumulative_metric_dict:
-        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ)
+        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ + 1)
     :param non_cumulative_metric_dict:
-        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ)
+        Dict maps str to np.ndarray of shape (RUNS, num_samples // LOG_FREQ + 1)
     :return:
     """
 
@@ -243,20 +243,21 @@ def comparison_plot(args: argparse.Namespace,
         avg_num_agreement_dict[method] = avg_num_agreement_dict[method].mean(axis=0)
         cumulative_metric_dict[method] = cumulative_metric_dict[method].mean(axis=0)
         non_cumulative_metric_dict[method] = non_cumulative_metric_dict[method].mean(axis=0)
+        if holdout_ece_dict:
+            holdout_ece_dict[method] = holdout_ece_dict[method].mean(axis=0)
 
-    _comparison_plot(avg_num_agreement_dict,
+    _comparison_plot(avg_num_agreement_dict, LOG_FREQ,
                      args.output / experiment_name / "avg_num_agreement.pdf",
                      'Avg number of agreement')
-    _comparison_plot(cumulative_metric_dict,
+    _comparison_plot(cumulative_metric_dict, LOG_FREQ,
                      args.output / experiment_name / "cumulative.pdf",
                      ('Cumulative %s' % args.metric))
-    _comparison_plot(non_cumulative_metric_dict,
+    _comparison_plot(non_cumulative_metric_dict, LOG_FREQ,
                      args.output / experiment_name / "non_cumulative.pdf",
                      ('Non cumulative %s' % args.metric))
     if holdout_ece_dict:
-        _comparison_plot(holdout_ece_dict,
-                         args.output / experiment_name / "holdout_ece.pdf",
-                         ('ECE %s' % args.metric))
+        _comparison_plot(holdout_ece_dict, CALIBRATION_FREQ,
+                         args.output / experiment_name / "holdout_ece.pdf", 'ECE')
 
 
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -292,19 +293,19 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     }
 
     avg_num_agreement_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     non_cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
 
     if SAMPLE:
@@ -417,6 +418,7 @@ class MpSafeSharedArray:
         np.bool: ctypes.c_bool,
         np.float: ctypes.c_double
     }
+
     def __init__(self, shape, dtype=np.float):
         warnings.warn('MpSafeSharedArray is experimental. Use at your own risk.')
 
@@ -426,7 +428,7 @@ class MpSafeSharedArray:
         self._dtype = dtype
 
         ctype = MpSafeSharedArray.DTYPE_TO_CTYPE[dtype]
-        num_elements = reduce(lambda x, y: x* y, shape)
+        num_elements = reduce(lambda x, y: x * y, shape)
         self._mp_arr = Array(ctype, num_elements)
 
     def get_lock(self):
@@ -466,21 +468,21 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     }
 
     avg_num_agreement_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     non_cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
 
     holdout_ece_dict = {
-        'non-active': np.zeros((RUNS, num_samples // CALIBRATION_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // CALIBRATION_FREQ)),
+        'non-active': np.zeros((RUNS, num_samples // CALIBRATION_FREQ + 1)),
+        'ts': np.zeros((RUNS, num_samples // CALIBRATION_FREQ + 1)),
     }
 
     if SAMPLE:
@@ -584,31 +586,33 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
                                         topk=args.topk)
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
-            non_cumulative_metric_dict['non-active'][r], holdout_ece_dict['non-active'][r] = eval(args,
-                                                                                                  sampled_categories_dict[
-                                                                                                      'non-active'][
-                                                                                                      r].tolist(),
-                                                                                                  sampled_observations_dict[
-                                                                                                      'non-active'][
-                                                                                                      r].tolist(),
-                                                                                                  sampled_scores_dict[
-                                                                                                      'non-active'][
-                                                                                                      r].tolist(),
-                                                                                                  ground_truth,
-                                                                                                  num_classes=num_classes,
-                                                                                                  prior=None)
+            avg_num_agreement_dict['non-active'][r], \
+            cumulative_metric_dict['non-active'][r], \
+            non_cumulative_metric_dict['non-active'][r], \
+            holdout_ece_dict['non-active'][r] = eval(args,
+                                                     sampled_categories_dict['non-active'][r].tolist(),
+                                                     sampled_observations_dict['non-active'][r].tolist(),
+                                                     sampled_scores_dict['non-active'][r].tolist(),
+                                                     ground_truth,
+                                                     num_classes=num_classes,
+                                                     holdout_categories=holdout_categories,
+                                                     holdout_observations=holdout_observations,
+                                                     holdout_confidences=holdout_confidences,
+                                                     prior=None)
 
-            avg_num_agreement_dict['ts'][r], cumulative_metric_dict['ts'][r], \
-            non_cumulative_metric_dict['ts'][r], holdout_ece_dict['ts'][r] = eval(args,
-                                                                                  sampled_categories_dict['ts'][
-                                                                                      r].tolist(),
-                                                                                  sampled_observations_dict['ts'][
-                                                                                      r].tolist(),
-                                                                                  sampled_scores_dict['ts'][r].tolist(),
-                                                                                  ground_truth,
-                                                                                  num_classes=num_classes,
-                                                                                  prior=None)
+            avg_num_agreement_dict['ts'][r], \
+            cumulative_metric_dict['ts'][r], \
+            non_cumulative_metric_dict['ts'][r], \
+            holdout_ece_dict['ts'][r] = eval(args,
+                                             sampled_categories_dict['ts'][r].tolist(),
+                                             sampled_observations_dict['ts'][r].tolist(),
+                                             sampled_scores_dict['ts'][r].tolist(),
+                                             ground_truth,
+                                             num_classes=num_classes,
+                                             holdout_categories=holdout_categories,
+                                             holdout_observations=holdout_observations,
+                                             holdout_confidences=holdout_confidences,
+                                             prior=None)
 
         for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
@@ -644,7 +648,7 @@ if __name__ == "__main__":
     parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
     parser.add_argument('--calibration_model', type=str, default=CALIBRATION_MODEL,
                         help='calibration models to apply on holdout data')
-    parser.add_argument('--sample_processes', type=int, default=2000,
+    parser.add_argument('--sample_processes', type=int, default=4,
                         help='Number of sample processes. Increase to speed up sampling.')
 
     args, _ = parser.parse_known_args()
