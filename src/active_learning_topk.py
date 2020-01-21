@@ -1,9 +1,12 @@
 import argparse
+import ctypes
 import logging
 import pathlib
 import random
+import warnings
 from collections import deque
-from multiprocessing import Process, JoinableQueue
+from itertools import product
+from multiprocessing import Array, Process, JoinableQueue
 from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
@@ -370,6 +373,33 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                         non_cumulative_metric_dict)
 
 
+class MpSafeSharedArray:
+    """Multiprocessing-safe shared array."""
+    DTYPE_TO_CTYPE = {
+        np.int: ctypes.c_int,
+        np.bool: ctypes.c_bool,
+        np.float: ctypes.c_double
+    }
+    def __init__(self, shape, dtype=np.float):
+        warnings.warn('MpSafeSharedArray is experimental. Use at your own risk.')
+
+        if dtype not in MpSafeSharedArray.DTYPE_TO_CTYPE:
+            raise ValueError('Unsupported dtype')
+        ctype = MpSafeSharedArray.DTYPE_TO_CTYPE[dtype]
+
+        self._shape = shape
+        self._dtype = dtype
+        self._mp_arr = Array(ctype, product(self._shape))
+
+    def get_lock(self):
+        return self._mp_arr.get_lock()
+
+    def get_array(self):
+        buffer = self._mp_arr.get_obj()
+        arr = np.ndarray(shape=self._shape, dtype=self.dtype, buffer=buffer)
+        return arr
+
+
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
 
@@ -388,29 +418,29 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         (args.output / experiment_name).mkdir()
 
     sampled_categories_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=int),
-        'ts': np.empty((RUNS, num_samples), dtype=int),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
     sampled_observations_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=bool),
-        'ts': np.empty((RUNS, num_samples), dtype=bool),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
     }
     sampled_scores_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=float),
-        'ts': np.empty((RUNS, num_samples), dtype=float),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=float),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=float),
     }
 
     avg_num_agreement_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
     }
     cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
     }
     non_cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ)),
     }
 
     if SAMPLE:
@@ -423,7 +453,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             # Continue to work until queue is empty
             while not queue.empty():
                 # Get a job (e.g. run index)
-                run_idx, sample_method = queue.get()
+                run_idx, method = queue.get()
                 sampled_categories, sampled_observations, sampled_scores = get_samples_topk(args,
                                                                                             categories,
                                                                                             observations,
@@ -433,34 +463,48 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                                                             sample_method=sample_method,
                                                                                             prior=None,
                                                                                             random_seed=r)
+                category_array = sampled_categories_dict[method]
+                with category_array.get_lock():
+                    arr = category_array.get_array()
+                    arr[run_idx] = sampled_categories
+
+                observation_array = sampled_observations_dict[method]
+                with observation_array.get_lock():
+                    arr = observation_array.get_array()
+                    arr[run_idx] = sampled_observations
+
+                score_array = sampled_scores_dict[method]
+                with score_array.get_lock():
+                    arr = score_array.get_array()
+                    arr[run_idx] = sampled_scores
+
                 queue.task_done()
-                return sampled_categories, sampled_observations, sampled_scores
 
         # Enqueue tasks
         logging.info('Enqueueing tasks')
         random_job_queue = JoinableQueue()
         ts_job_queue = JoinableQueue()
         for i in range(RUNS):
-            random_job_queue.put((i, 'random'))
-            ts_job_queue.put(i, 'ts')
+            random_job_queue.put((i, 'non-active'))
+            ts_job_queue.put((i, 'ts'))
 
-            # Start random workers
-            logging.info('Running non-active sampling')
-            for j in range(args.sample_processes):
-                process = Process(target=sampler_worker, args=(random_job_queue,))
+        # Start random workers
+        logging.info('Running non-active sampling')
+        for _ in range(args.sample_processes):
+            process = Process(target=sampler_worker, args=(random_job_queue,))
             process.start()
 
-            # Make sure all random workers are done before proceeding
-            random_job_queue.join()
+        # Make sure all random workers are done before proceeding
+        random_job_queue.join()
 
-            # Start ts workers
-            logging.info('Running Thompson sampling')
-            for j in range(args.sample_processes):
-                process = Process(target=sampler_worker, args=(ts_job_queue,))
+        # Start ts workers
+        logging.info('Running Thompson sampling')
+        for _ in range(args.sample_processes):
+            process = Process(target=sampler_worker, args=(ts_job_queue,))
             process.start()
 
-            # Make sure all ts workers are done before proceeding
-            ts_job_queue.join()
+        # Make sure all ts workers are done before proceeding
+        ts_job_queue.join()
 
         # write samples to file
         for method in ['non-active', 'ts']:
