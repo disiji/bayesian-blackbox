@@ -427,8 +427,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
     }
     sampled_scores_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=float),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=float),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
     }
 
     avg_num_agreement_dict = {
