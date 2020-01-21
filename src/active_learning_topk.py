@@ -511,25 +511,24 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
                                 non_cumulative_metric_dict)
 
-            if __name__ == "__main__":
-                parser = argparse.ArgumentParser()
-            parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-            parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
-            parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
-            parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
-            parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
-            parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
 
-            parser.add_argument('--evaluation_freq', type=int, default=1,
-                                help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
-            parser.add_argument('--sample_processes', type=int, default=1,
-                                help='Number of sample processes. Increase to speed up sampling.')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
+    parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
+    parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
+    parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
+    parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
+    parser.add_argument('--evaluation_freq', type=int, default=1,
+                        help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
+    parser.add_argument('--sample_processes', type=int, default=1,
+                        help='Number of sample processes. Increase to speed up sampling.')
 
-            args, _ = parser.parse_known_args()
+    args, _ = parser.parse_known_args()
 
-            logging.basicConfig(level=logging.INFO)
-            if args.dataset not in DATASET_LIST:
-                raise ValueError("%s is not in DATASET_LIST." % args.dataset)
+    logging.basicConfig(level=logging.INFO)
+    if args.dataset not in DATASET_LIST:
+        raise ValueError("%s is not in DATASET_LIST." % args.dataset)
 
     print(args.dataset, args.mode, '...')
     if args.metric == 'accuracy':
