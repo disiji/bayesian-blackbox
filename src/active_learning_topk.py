@@ -58,8 +58,9 @@ def get_samples_topk(args: argparse.Namespace,
     sample_fct = SAMPLE_CATEGORY[sample_method]
 
     topk = args.topk
+    idx = 0
 
-    for idx in range(num_samples):
+    while idx < num_samples:
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
         # then the return 'category_list' is an int
@@ -91,6 +92,8 @@ def get_samples_topk(args: argparse.Namespace,
 
             sampled_categories[idx] = category
             sampled_observations[idx] = observation
+
+            idx += 1
 
     return sampled_categories, sampled_observations, sampled_scores
 
@@ -287,6 +290,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                     sample_method='ts',
                                                                     prior=UNIFORM_PRIOR,
                                                                     random_seed=r)
+
             sampled_categories_dict['ts_informed'][r], sampled_observations_dict['ts_informed'][r], \
             sampled_scores_dict['ts_informed'][r] = get_samples_topk(args,
                                                                      categories,
