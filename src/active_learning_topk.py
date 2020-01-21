@@ -491,14 +491,14 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                        num_classes=num_classes,
                                                        prior=None)
 
-            for method in ['non-active', 'ts']:
-                np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
-                        avg_num_agreement_dict[method])
+        for method in ['non-active', 'ts']:
+            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
+                    avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
                     cumulative_metric_dict[method])
             np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
                     non_cumulative_metric_dict[method])
-            else:
+        else:
             for method in ['non-active', 'ts']:
                 avg_num_agreement_dict[method] = np.load(
                     args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
