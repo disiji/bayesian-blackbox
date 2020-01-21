@@ -23,6 +23,7 @@ RUNS = 100
 LOG_FREQ = 10
 PRIOR_STRENGTH = 5
 
+
 def get_samples_topk(args: argparse.Namespace,
                      categories: List[int],
                      observations: List[bool],
@@ -56,6 +57,8 @@ def get_samples_topk(args: argparse.Namespace,
     sampled_scores = np.zeros((num_samples,), dtype=np.float)
     sample_fct = SAMPLE_CATEGORY[sample_method]
 
+    topk = args.topk
+
     for idx in range(num_samples):
         # sampling process:
         # if there are less than k available arms to play, switch to top 1, the sampling method has been switched to top1,
@@ -63,21 +66,13 @@ def get_samples_topk(args: argparse.Namespace,
         categories_list = sample_fct(deques=deques,
                                      random_seed=random_seed,
                                      model=model,
-                                     mode=mode,
-                                     topk=args.topk,
+                                     mode=args.mode,
+                                     topk=topk,
                                      max_ttts_trial=50,
                                      ttts_beta=0.5,
                                      epsilon=0.1,
                                      ucb_c=1, )
 
-        # COMMENT: @rloganiv - Two issues with the following block of code:
-        # 1. It is weird that categories list is not always a list. Instead of post-processing
-        # here, it is preferable to have the output of all of the SAMPLE_CATEGORY functions
-        # be a list.
-        # 2. Overriding args.topk is really dangerous here - it will be set to 1 for all subsequent
-        # functions (e.g., during evaluation), and furthermore people using your code will have no
-        # idea this has happened. If args.topk > 1 is not a valid choice for certain sample methods
-        # then you should raise an Error early on.
         if type(categories_list) != list:
             categories_list = [categories_list]
             if topk != 1:
@@ -96,17 +91,6 @@ def get_samples_topk(args: argparse.Namespace,
 
             sampled_categories[idx] = category
             sampled_observations[idx] = observation
-
-    # write sampled_categories, sampled_observations, sampled_scores to file
-    dir = args.output / experiment_name
-    try:
-        os.stat(dir)
-    except:
-        os.mkdir(dir)
-
-    pickle.dump(sampled_categories, open(dir / 'sampled_categories.pkl', "wb"))
-    pickle.dump(sampled_observations, open(dir / 'sampled_observations.pkl', "wb"))
-    pickle.dump(sampled_scores, open(dir / 'sampled_scores.pkl', "wb"))
 
     return sampled_categories, sampled_observations, sampled_scores
 
@@ -168,7 +152,7 @@ def eval(args: argparse.Namespace,
                 indices = metric_val.argsort()[-args.topk:]
             topk_arms[indices] = 1
             # evaluation
-            avg_num_agreement[idx // LOG_FREQ] = topk_arms[ground_truth==1].mean()
+            avg_num_agreement[idx // LOG_FREQ] = topk_arms[ground_truth == 1].mean()
             # todo: each class is equally weighted by taking the mean. replace with frequency.(?)
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
@@ -281,7 +265,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
     if SAMPLE:
         for r in tqdm(range(RUNS)):
-            sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], sampled_scores_dict['non-active'][
+            sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], \
+            sampled_scores_dict['non-active'][
                 r] = get_samples_topk(args,
                                       categories,
                                       observations,
@@ -334,12 +319,12 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
             non_cumulative_metric_dict['non-active'][r] = eval(args,
-                                                           sampled_categories_dict['non-active'][r].tolist(),
-                                                           sampled_observations_dict['non-active'][r].tolist(),
-                                                           sampled_scores_dict['non-active'][r].tolist(),
-                                                           ground_truth,
-                                                           num_classes=num_classes,
-                                                           prior=UNIFORM_PRIOR)
+                                                               sampled_categories_dict['non-active'][r].tolist(),
+                                                               sampled_observations_dict['non-active'][r].tolist(),
+                                                               sampled_scores_dict['non-active'][r].tolist(),
+                                                               ground_truth,
+                                                               num_classes=num_classes,
+                                                               prior=UNIFORM_PRIOR)
 
             avg_num_agreement_dict['ts_uniform'][r], cumulative_metric_dict['ts_uniform'][r], \
             non_cumulative_metric_dict['ts_uniform'][r] = eval(args,
@@ -423,97 +408,50 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         # COMMENT: @rloganiv - I think the only way to speed up sampling is to use multiple
         # processes, so that runs can be done in parallel. The code below is a lazy attempt at
         # doing so.
-        def random_worker(queue):
+        def sampler_worker(queue):
             # Continue to work until queue is empty
             while not queue.empty():
                 # Get a job (e.g. run index)
-                run_idx = queue.get()
-                experiment_name = args.dataset + '_ece_random_run_idx_'+ str(run_idx)
-                get_samples_topk(args,
-                                 categories,
-                                 observations,
-                                 confidences,
-                                 NUM_CLASSES,
-                                 N,
-                                 sample_method='random',
-                                 mode=MODE,
-                                 metric='calibration_error',
-                                 prior=None,
-                                 # Arguments that change across runs below.
-                                 random_seed=run_idx,
-                                 experiment_name=experiment_name)
+                run_idx, sample_method = queue.get()
+                sampled_categories, sampled_observations, sampled_scores = get_samples_topk(args,
+                                                                                            categories,
+                                                                                            observations,
+                                                                                            confidences,
+                                                                                            num_classes,
+                                                                                            num_samples,
+                                                                                            sample_method=sample_method,
+                                                                                            prior=None,
+                                                                                            random_seed=r)
                 queue.task_done()
-
-        def ts_worker(queue):
-            # Continue to work until queue is empty
-            while not queue.empty():
-                # Get a job (e.g. run index)
-                run_idx = queue.get()
-                experiment_name = args.dataset + '_ece_ts_run_idx_'+ str(run_idx)
-                get_samples_topk(args,
-                                 categories,
-                                 observations,
-                                 confidences,
-                                 NUM_CLASSES,
-                                 N,
-                                 sample_method='ts',
-                                 mode=MODE,
-                                 metric='calibration_error',
-                                 prior=None,
-                                 # Arguments that change across runs below.
-                                 random_seed=run_idx,
-                                 experiment_name=experiment_name)
-                queue.task_done()
+                return sampled_categories, sampled_observations, sampled_scores
 
         # Enqueue tasks
         logging.info('Enqueueing tasks')
         random_job_queue = JoinableQueue()
         ts_job_queue = JoinableQueue()
         for i in range(RUNS):
-            random_job_queue.put(i)
-            ts_job_queue.put(i)
+            random_job_queue.put((i, 'random'))
+            ts_job_queue.put(i, 'ts')
 
-        # Start random workers
-        logging.info('Running random sampling')
-        processes = []
-        for j in range(args.sample_processes):
-            process = Process(target=random_worker, args=(random_job_queue,))
+            # Start random workers
+            logging.info('Running non-active sampling')
+            for j in range(args.sample_processes):
+                process = Process(target=sampler_worker, args=(random_job_queue,))
             process.start()
 
-        # Make sure all random workers are done before proceeding
-        random_job_queue.join()
+            # Make sure all random workers are done before proceeding
+            random_job_queue.join()
 
-        # Start ts workers
-        logging.info('Running Thompson sampling')
-        processes = []
-        for j in range(args.sample_processes):
-            process = Process(target=ts_worker, args=(ts_job_queue,))
+            # Start ts workers
+            logging.info('Running Thompson sampling')
+            for j in range(args.sample_processes):
+                process = Process(target=sampler_worker, args=(ts_job_queue,))
             process.start()
 
-        # Make sure all ts workers are done before proceeding
-        ts_job_queue.join()
+            # Make sure all ts workers are done before proceeding
+            ts_job_queue.join()
 
-    if EVAL:
-        logging.info('Starting evaluation')
-        for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
-            non_cumulative_metric_dict['non-active'][r] = eval(args,
-                                                           sampled_categories_dict['non-active'][r].tolist(),
-                                                           sampled_observations_dict['non-active'][r].tolist(),
-                                                           sampled_scores_dict['non-active'][r].tolist(),
-                                                           ground_truth,
-                                                           num_classes=num_classes,
-                                                           prior=None)
-
-            avg_num_agreement_dict['ts'][r], cumulative_metric_dict['ts'][r], \
-            non_cumulative_metric_dict['ts'][r] = eval(args,
-                                                       sampled_categories_dict['ts'][r].tolist(),
-                                                       sampled_observations_dict['ts'][r].tolist(),
-                                                       sampled_scores_dict['ts'][r].tolist(),
-                                                       ground_truth,
-                                                       num_classes=num_classes,
-                                                       prior=None)
-
+        # write samples to file
         for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
@@ -530,25 +468,68 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             non_cumulative_metric_dict[method] = np.load(
                 args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
 
-    if PLOT:
-        comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
-                        non_cumulative_metric_dict)
+    if EVAL:
+        logging.info('Starting evaluation')
+        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                        topk=args.topk)
+        for r in tqdm(range(RUNS)):
+            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
+            non_cumulative_metric_dict['non-active'][r] = eval(args,
+                                                               sampled_categories_dict['non-active'][r].tolist(),
+                                                               sampled_observations_dict['non-active'][r].tolist(),
+                                                               sampled_scores_dict['non-active'][r].tolist(),
+                                                               ground_truth,
+                                                               num_classes=num_classes,
+                                                               prior=None)
 
+            avg_num_agreement_dict['ts'][r], cumulative_metric_dict['ts'][r], \
+            non_cumulative_metric_dict['ts'][r] = eval(args,
+                                                       sampled_categories_dict['ts'][r].tolist(),
+                                                       sampled_observations_dict['ts'][r].tolist(),
+                                                       sampled_scores_dict['ts'][r].tolist(),
+                                                       ground_truth,
+                                                       num_classes=num_classes,
+                                                       prior=None)
 
-if __name__ == "__main__":
+            for method in ['non-active', 'ts']:
+                np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
+                        avg_num_agreement_dict[method])
+            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
+                    cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
+                    non_cumulative_metric_dict[method])
+            else:
+            for method in ['non-active', 'ts']:
+                avg_num_agreement_dict[method] = np.load(
+                    args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
+            cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+            non_cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
-    parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
-    parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
-    parser.add_argument('--evaluation_freq', type=int,  default=1, help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
-    parser.add_argument('--sample_processes', type=int, default=1, help='Number of sample processes. Increase to speed up sampling.')
-    args, _ = parser.parse_known_args()
+            if PLOT:
+                comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
+                                non_cumulative_metric_dict)
 
-    logging.basicConfig(level=logging.INFO)
-    if args.dataset not in DATASET_LIST:
-        raise ValueError("%s is not in DATASET_LIST." % args.dataset)
+            if __name__ == "__main__":
+                parser = argparse.ArgumentParser()
+            parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
+            parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
+            parser.add_argument('--fig_dir', type=pathlib.Path, default=FIGURE_DIR, help='figures output prefix')
+            parser.add_argument('--topk', type=int, default=10, help='number of optimal arms to identify')
+            parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
+            parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
+
+            parser.add_argument('--evaluation_freq', type=int, default=1,
+                                help='Evaluation frequency. Set to a higher number to speed up evaluation on ImageNet and CIFAR.')
+            parser.add_argument('--sample_processes', type=int, default=1,
+                                help='Number of sample processes. Increase to speed up sampling.')
+
+            args, _ = parser.parse_known_args()
+
+            logging.basicConfig(level=logging.INFO)
+            if args.dataset not in DATASET_LIST:
+                raise ValueError("%s is not in DATASET_LIST." % args.dataset)
 
     print(args.dataset, args.mode, '...')
     if args.metric == 'accuracy':
