@@ -1,9 +1,12 @@
 import argparse
+import ctypes
 import logging
 import pathlib
 import random
+import warnings
 from collections import deque
-from multiprocessing import Process, JoinableQueue
+from functools import reduce
+from multiprocessing import Array, Process, JoinableQueue
 from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
@@ -407,6 +410,34 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                         non_cumulative_metric_dict)
 
 
+class MpSafeSharedArray:
+    """Multiprocessing-safe shared array."""
+    DTYPE_TO_CTYPE = {
+        np.int: ctypes.c_long,
+        np.bool: ctypes.c_bool,
+        np.float: ctypes.c_double
+    }
+    def __init__(self, shape, dtype=np.float):
+        warnings.warn('MpSafeSharedArray is experimental. Use at your own risk.')
+
+        if dtype not in MpSafeSharedArray.DTYPE_TO_CTYPE:
+            raise ValueError('Unsupported dtype')
+        self._shape = shape
+        self._dtype = dtype
+
+        ctype = MpSafeSharedArray.DTYPE_TO_CTYPE[dtype]
+        num_elements = reduce(lambda x, y: x* y, shape)
+        self._mp_arr = Array(ctype, num_elements)
+
+    def get_lock(self):
+        return self._mp_arr.get_lock()
+
+    def get_array(self):
+        buffer = self._mp_arr.get_obj()
+        arr = np.ndarray(shape=self._shape, dtype=self._dtype, buffer=buffer)
+        return arr
+
+
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
@@ -422,16 +453,16 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         (args.output / experiment_name).mkdir()
 
     sampled_categories_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=int),
-        'ts': np.empty((RUNS, num_samples), dtype=int),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
     sampled_observations_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=bool),
-        'ts': np.empty((RUNS, num_samples), dtype=bool),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
     }
     sampled_scores_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=float),
-        'ts': np.empty((RUNS, num_samples), dtype=float),
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
     }
 
     avg_num_agreement_dict = {
@@ -455,68 +486,98 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     if SAMPLE:
         logging.info('Starting sampling')
 
-        # COMMENT: @rloganiv - I think the only way to speed up sampling is to use multiple
-        # processes, so that runs can be done in parallel. The code below is a lazy attempt at
-        # doing so.
         def sampler_worker(queue):
             # Continue to work until queue is empty
             while not queue.empty():
                 # Get a job (e.g. run index)
                 run_idx, sample_method = queue.get()
+                print(run_idx)
+
+                # @disiji - update if you change the name...
+                if sample_method == 'non-active':
+                    method = 'random'
+                else:
+                    method = sample_method
+
                 sampled_categories, sampled_observations, sampled_scores = get_samples_topk(args,
                                                                                             categories,
                                                                                             observations,
                                                                                             confidences,
                                                                                             num_classes,
                                                                                             num_samples,
-                                                                                            sample_method=sample_method,
+                                                                                            sample_method=method,
                                                                                             prior=None,
-                                                                                            random_seed=r)
+                                                                                            random_seed=run_idx)
+                category_array = sampled_categories_dict[sample_method]
+                with category_array.get_lock():
+                    arr = category_array.get_array()
+                    arr[run_idx] = sampled_categories
+
+                observation_array = sampled_observations_dict[sample_method]
+                with observation_array.get_lock():
+                    arr = observation_array.get_array()
+                    arr[run_idx] = sampled_observations
+
+                score_array = sampled_scores_dict[sample_method]
+                with score_array.get_lock():
+                    arr = score_array.get_array()
+                    arr[run_idx] = sampled_scores
+
                 queue.task_done()
-                return sampled_categories, sampled_observations, sampled_scores
 
         # Enqueue tasks
         logging.info('Enqueueing tasks')
         random_job_queue = JoinableQueue()
         ts_job_queue = JoinableQueue()
         for i in range(RUNS):
-            random_job_queue.put((i, 'random'))
-            ts_job_queue.put(i, 'ts')
+            random_job_queue.put((i, 'non-active'))
+            ts_job_queue.put((i, 'ts'))
 
-            # Start random workers
-            logging.info('Running non-active sampling')
-            for j in range(args.sample_processes):
-                process = Process(target=sampler_worker, args=(random_job_queue,))
+        # Start random workers
+        logging.info('Running non-active sampling')
+        for _ in range(args.sample_processes):
+            process = Process(target=sampler_worker, args=(random_job_queue,))
             process.start()
 
-            # Make sure all random workers are done before proceeding
-            random_job_queue.join()
+        # Make sure all random workers are done before proceeding
+        random_job_queue.join()
 
-            # Start ts workers
-            logging.info('Running Thompson sampling')
-            for j in range(args.sample_processes):
-                process = Process(target=sampler_worker, args=(ts_job_queue,))
+        # Start ts workers
+        logging.info('Running Thompson sampling')
+        for _ in range(args.sample_processes):
+            process = Process(target=sampler_worker, args=(ts_job_queue,))
             process.start()
 
-            # Make sure all ts workers are done before proceeding
-            ts_job_queue.join()
+        # Make sure all ts workers are done before proceeding
+        ts_job_queue.join()
 
-        # write samples to file
+        # We want numpy arrays but instead have the weird custom process-safe arrays.
+        # Since the rest of the code expects a numpy array we're going to replace the
+        # elements in the dictionaries with their array counterparts.
         for method in ['non-active', 'ts']:
-            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
-                    avg_num_agreement_dict[method])
-            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
-                    cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
-                    non_cumulative_metric_dict[method])
+            with sampled_categories_dict[method].get_lock():
+                sampled_categories_dict[method] = sampled_categories_dict[method].get_array()
+            with sampled_observations_dict[method].get_lock():
+                sampled_observations_dict[method] = sampled_observations_dict[method].get_array()
+            with sampled_scores_dict[method].get_lock():
+                sampled_scores_dict[method] = sampled_scores_dict[method].get_array()
+
+        # Write to disk
+        for method in ['non-active', 'ts']:
+            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
+                    sampled_categories_dict[method])
+            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
+                    sampled_observations_dict[method])
+            np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method),
+                    sampled_scores_dict[method])
     else:
+        # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts']:
-            avg_num_agreement_dict[method] = np.load(
-                args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-            cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-            non_cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            sampled_categories_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_categories_%s.npy' % method))
+            sampled_observations_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_observations_%s.npy' % method))
+            sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
 
     if EVAL:
         logging.info('Starting evaluation')
