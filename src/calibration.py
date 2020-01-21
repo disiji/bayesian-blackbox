@@ -423,21 +423,24 @@ class IsotonicRegression(CalibrationMethod):
 
 class HistogramBinning(CalibrationMethod):
     """
-    Probability calibration using histogram binning
-    Histogram binning [1]_ is a nonparametric approach to probability calibration. Classifier scores are binned into a given
-    number of bins either based on fixed width or frequency. Classifier scores are then computed based on the empirical
-    frequency of class 1 in each bin.
-    Parameters
-    ----------
-        mode : str, default='equal_width'
-            Binning mode used. One of ['equal_width', 'equal_freq'].
-        n_bins : int, default=20
-            Number of bins to bin classifier scores into.
-        input_range : list, shape (2,), default=[0, 1]
-            Range of the classifier scores.
-    .. [1] Zadrozny, B. & Elkan, C. Obtaining calibrated probability estimates from decision trees and naive Bayesian
-           classifiers in Proceedings of the 18th International Conference on Machine Learning (ICML, 2001), 609–616.
+
+        Probability calibration using histogram binning
+        Histogram binning [1]_ is a nonparametric approach to probability calibration. Classifier scores are binned into a
+        given number of bins either based on fixed width or frequency. Classifier scores are then computed based on the
+        empirical frequency of class 1 in each bin.
+
+        Parameters
+        ----------
+            mode : str, default='equal_width'
+                Binning mode used. One of ['equal_width', 'equal_freq'].
+            n_bins : int, default=20
+                Number of bins to bin classifier scores into.
+            input_range : list, shape (2,), default=[0, 1]
+                Range of the classifier scores.
+        .. [1] Zadrozny, B. & Elkan, C. Obtaining calibrated probability estimates from decision trees and naive Bayesian
+               classifiers in Proceedings of the 18th International Conference on Machine Learning (ICML, 2001), 609–616.
     """
+
 
     def __init__(self, mode='equal_freq', n_bins=20, input_range=[0, 1]):
         super().__init__()
@@ -709,3 +712,13 @@ class BayesianBinningQuantiles(CalibrationMethod):
         elif np.shape(X)[1] > 2:
             check_is_fitted(self, "onevsrest_calibrator_")
             return self.onevsrest_calibrator_.predict_proba(X)
+
+
+CALIBRATION_MODELS = {
+    'no_calibration': NoCalibration,
+    'temperature_scaling': TemperatureScaling,
+    'platt_scaling': PlattScaling,
+    'isotonic_regression': IsotonicRegression,
+    'histogram_binning': HistogramBinning,
+    'bayesian_binning_quantiles': BayesianBinningQuantiles.
+}
