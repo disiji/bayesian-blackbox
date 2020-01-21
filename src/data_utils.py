@@ -1,6 +1,7 @@
 import random
 import numpy as np
 from typing import List
+np.random.seed(0)
 
 datafile_dict = {
     'cifar100': '../data/cifar100/cifar100_predictions_dropout.txt',
@@ -99,7 +100,10 @@ def train_holdout_split(categories: List[int], observations: List[bool], confide
     Split categories, observations and confidences into train and holdout with hold_ratio.
     """
     num_samples = len(categories)
-    mask = np.random.choice([0, 1], size=(num_samples,), p=[1 - holdout_ratio, holdout_ratio])
+
+    indices = np.random.permutation(num_samples)
+    mask = np.zeros(num_samples)
+    mask[indices[:int(len(categories) * holdout_ratio)]] = 1
 
     train_categories = [categories[idx] for idx in range(num_samples) if mask[idx] == 0]
     train_observations = [observations[idx] for idx in range(num_samples) if mask[idx] == 0]

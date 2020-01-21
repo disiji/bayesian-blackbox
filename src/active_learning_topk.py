@@ -24,7 +24,7 @@ DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
 RUNS = 100
-LOG_FREQ = 10
+LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
 CALIBRATION_MODEL = 'histogram_binning'
@@ -182,7 +182,7 @@ def eval(args: argparse.Namespace,
             if idx == 0:
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
             else:
-                calibration_model = CALIBRATION_MODELS[args.calibration_model]()
+                calibration_model = CALIBRATION_MODELS[args.calibration_model](mode='equal_width')
                 X = np.array(confidences[:idx])
                 X = np.array([1 - X, X]).T
                 y = np.array(observations[:idx]) * 1.0
@@ -203,14 +203,15 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
 
     for method_name, metric_eval in eval_result_dict.items():
+        metric_eval = metric_eval[:-1]
         x = np.arange(len(metric_eval)) * eval_freq
-        plt.plot(x[1:], metric_eval[1:], label=method_name)
+        plt.plot(x, metric_eval, label=method_name)
     plt.xlabel('#Queries')
     plt.ylabel(ylabel)
     plt.legend()
     plt.yticks(fontsize=FONT_SIZE)
     plt.xticks(fontsize=FONT_SIZE)
-    plt.ylim(0.0, 1.0)
+    # plt.ylim(0.0, 1.0)
     plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
 
 
@@ -627,12 +628,12 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         for method in ['non-active', 'ts']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-        cumulative_metric_dict[method] = np.load(
-            args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-        non_cumulative_metric_dict[method] = np.load(
-            args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
-        holdout_ece_dict[method] = np.load(
-            args.output / experiment_name / ('holdout_ece_%s.npy' % method))
+            cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+            non_cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            holdout_ece_dict[method] = np.load(
+                args.output / experiment_name / ('holdout_ece_%s.npy' % method))
 
     if PLOT:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
@@ -661,4 +662,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
