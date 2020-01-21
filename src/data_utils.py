@@ -1,3 +1,7 @@
+import random
+import numpy as np
+from typing import List
+
 datafile_dict = {
     'cifar100': '../data/cifar100/cifar100_predictions_dropout.txt',
     'imagenet': '../data/imagenet/resnet152_imagenet_outputs.txt',
@@ -41,3 +45,68 @@ output_str_dict = {
 }
 
 DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
+
+
+# this function is different from bayesian_reliabiitly.prepare_data
+def prepare_data(filename, four_column=False):
+    """
+
+    :param filename: str
+    :param four_column: indicates whether the dataformat is "index, correct class, predicted class, confidence"
+                        or true label followed by a vector of scores for each class
+    :return:
+            categories: List[int], predicted class
+            observations: List[bool], whether predicted class is the same as truth class
+            confidence: List[float]
+            idx2category: Dict[int, str] or None
+            category2idx: Dict[str, int] or None
+
+    """
+    if four_column:
+        # when file is in 4 column format: index, correct class, predicted class, confidence
+        with open(filename, 'r') as f:
+            category2idx = dict()
+            idx2category = []
+            categories = []
+            observations = []
+            confidences = []
+            next(f)
+            for line in f:
+                _, correct, predicted, confidence = line.split()
+                if predicted not in category2idx:
+                    category2idx[predicted] = len(category2idx)
+                    idx2category.append(predicted)
+                idx = category2idx[predicted]
+                categories.append(idx)
+                observations.append(correct == predicted)
+                confidences.append(float(confidence))
+
+    else:
+        data = np.genfromtxt(filename)
+        categories = np.argmax(data[:, 1:], axis=1).astype(int)
+        confidences = list(np.max(data[:, 1:], axis=1).astype(float))
+        observations = list((categories == data[:, 0]))
+        categories = list(categories)
+        idx2category = None
+        category2idx = None
+        print("Accuracy: %.3f" % (len([_ for _ in observations if _ == True]) * 1.0 / len(observations)))
+    return categories, observations, confidences, idx2category, category2idx
+
+
+def train_holdout_split(categories: List[int], observations: List[bool], confidences: List[float],
+                        holdout_ratio: float = 0.2):
+    """
+    Split categories, observations and confidences into train and holdout with hold_ratio.
+    """
+    num_samples = len(categories)
+    mask = np.random.choice([0, 1], size=(num_samples,), p=[1 - holdout_ratio, holdout_ratio])
+
+    train_categories = [categories[idx] for idx in range(num_samples) if mask[idx] == 0]
+    train_observations = [observations[idx] for idx in range(num_samples) if mask[idx] == 0]
+    train_confidences = [confidences[idx] for idx in range(num_samples) if mask[idx] == 0]
+
+    holdout_categories = [categories[idx] for idx in range(num_samples) if mask[idx] == 1]
+    holdout_observations = [observations[idx] for idx in range(num_samples) if mask[idx] == 1]
+    holdout_confidences = [confidences[idx] for idx in range(num_samples) if mask[idx] == 1]
+
+    return train_categories, train_observations, train_confidences, holdout_categories, holdout_observations, holdout_confidences

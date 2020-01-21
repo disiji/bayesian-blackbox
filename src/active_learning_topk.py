@@ -8,8 +8,8 @@ from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
-from active_utils import prepare_data, SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth
-from data_utils import datafile_dict, num_classes_dict, DATASET_LIST
+from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth
+from data_utils import datafile_dict, num_classes_dict, DATASET_LIST, prepare_data, train_holdout_split
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
 
@@ -223,6 +223,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     num_classes = num_classes_dict[args.dataset]
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
+
     num_samples = len(observations)
 
     UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * PRIOR_STRENGTH
@@ -373,6 +374,12 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     num_classes = num_classes_dict[args.dataset]
 
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
+
+    categories, observations, confidences, holdout_categories, holdout_observations, holdout_confidences = train_holdout_split(
+        categories, observations, confidences,
+        holdout_ratio=0.2)
+
+    print(len(categories), len(observations), len(confidences), len(holdout_categories), len(holdout_observations), len(holdout_confidences))
     num_samples = len(observations)
 
     experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
