@@ -165,7 +165,6 @@ class TemperatureScaling(CalibrationMethod):
         self : object
             Returns an instance of self.
         """
-
         # Define objective function (NLL / cross entropy)
         def objective(T):
             # Calibrate with given T
