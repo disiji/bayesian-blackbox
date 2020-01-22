@@ -14,14 +14,15 @@ import sklearn.utils
 from sklearn.base import clone
 from sklearn.utils.validation import check_is_fitted
 
+# Ignore FutureWarnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+
 # Turn off tensorflow deprecation warnings
 try:
     from tensorflow.python.util import module_wrapper as deprecation
 except ImportError:
     from tensorflow.python.util import deprecation_wrapper as deprecation
 deprecation._PER_MODULE_WARNING_LIMIT = 0
-# Ignore binned_statistic FutureWarning
-warnings.simplefilter(action='ignore', category=FutureWarning)
 
 
 class CalibrationMethod(sklearn.base.BaseEstimator):
@@ -245,18 +246,7 @@ class TemperatureScaling(CalibrationMethod):
         Returns
         -------
         """
-        # check_is_fitted(self, "T")
-        #
-        # # Plot latent function
-        # fig, axes = pycalib.texfig.subplots(nrows=1, ncols=1, sharex=True, **kwargs)
-        # axes.plot(z, self.T * z, label="latent function")
-        # axes.set_ylabel("$T\\bm{z}$")
-        # axes.set_xlabel("$\\bm{z}_k$")
-        # fig.align_labels()
-        #
-        # # Save plot to file
-        # pycalib.texfig.savefig(filename)
-        # plt.close()
+        pass
 
 
 class PlattScaling(CalibrationMethod):

@@ -1,12 +1,13 @@
 import argparse
 import ctypes
 import logging
+import multiprocessing
 import pathlib
 import random
 import warnings
 from collections import deque
 from functools import reduce
-from multiprocessing import Array, Process, JoinableQueue
+from multiprocessing import Array, Lock, Process, JoinableQueue
 from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
@@ -23,12 +24,15 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
-RUNS = 100
+RUNS = 4
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
 CALIBRATION_MODEL = 'temperature_scaling'
 HOLDOUT_RATIO = 0.1
+
+logger = logging.getLogger(__name__)
+process_lock = Lock()
 
 
 def get_samples_topk(args: argparse.Namespace,
@@ -170,7 +174,8 @@ def eval(args: argparse.Namespace,
             holdout_X = np.array([1 - holdout_X, holdout_X]).T
         elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
             holdout_indices_array = np.array(holdout_indices, dtype=np.int)
-            holdout_X = logits[holdout_indices_array]
+            with process_lock:
+                holdout_X = logits[holdout_indices_array]
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
 
@@ -507,6 +512,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         logits = np.genfromtxt(logits_path)[:, 1:]
     else:
         logits = None
+    logits_lock = Lock()
 
     indices = np.arange(len(categories))
 
@@ -543,38 +549,39 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     }
 
     avg_num_agreement_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
     }
     cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
     }
     non_cumulative_metric_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
     }
-
     holdout_ece_dict = {
-        'non-active': np.zeros((RUNS, num_samples // CALIBRATION_FREQ + 1)),
-        'ts': np.zeros((RUNS, num_samples // CALIBRATION_FREQ + 1)),
+        'non-active': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
+        'ts': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
     }
 
     if SAMPLE:
-        logging.info('Starting sampling')
+        logger.info('Starting sampling')
 
         def sampler_worker(queue):
             # Continue to work until queue is empty
             while not queue.empty():
                 # Get a job (e.g. run index)
                 run_idx, sample_method = queue.get()
-                print(run_idx)
 
                 # @disiji - update if you change the name...
                 if sample_method == 'non-active':
                     method = 'random'
                 else:
                     method = sample_method
+
+                with process_lock:
+                    logger.debug(f'Working on sampling task :: Run: {run_idx} :: Method {method}')
 
                 sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices = \
                     get_samples_topk(args,
@@ -588,6 +595,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                      sample_method=method,
                                      prior=None,
                                      random_seed=run_idx)
+
                 category_array = sampled_categories_dict[sample_method]
                 with category_array.get_lock():
                     arr = category_array.get_array()
@@ -616,30 +624,21 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 queue.task_done()
 
         # Enqueue tasks
-        logging.info('Enqueueing tasks')
-        random_job_queue = JoinableQueue()
-        ts_job_queue = JoinableQueue()
+        logger.debug('Enqueueing sampling tasks')
+        sampling_job_queue = JoinableQueue()
         for i in range(RUNS):
-            random_job_queue.put((i, 'non-active'))
-            ts_job_queue.put((i, 'ts'))
+            sampling_job_queue.put((i, 'non-active'))
+            sampling_job_queue.put((i, 'ts'))
 
-        # Start random workers
-        logging.info('Running non-active sampling')
-        for _ in range(args.sample_processes):
-            process = Process(target=sampler_worker, args=(random_job_queue,))
+        # Start tasks
+        logger.debug('Running sampling tasks')
+        for _ in range(args.processes):
+            process = Process(target=sampler_worker, args=(sampling_job_queue,))
             process.start()
 
-        # Make sure all random workers are done before proceeding
-        random_job_queue.join()
-
-        # Start ts workers
-        logging.info('Running Thompson sampling')
-        for _ in range(args.sample_processes):
-            process = Process(target=sampler_worker, args=(ts_job_queue,))
-            process.start()
-
-        # Make sure all ts workers are done before proceeding
-        ts_job_queue.join()
+        # Make sure all work is done before proceeding
+        sampling_job_queue.join()
+        logger.debug('Sampling finished')
 
         # We want numpy arrays but instead have the weird custom process-safe arrays.
         # Since the rest of the code expects a numpy array we're going to replace the
@@ -658,67 +657,94 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
 
         # Write to disk
         for method in ['non-active', 'ts']:
-            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
-                    sampled_categories_dict[method])
-            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
-                    sampled_observations_dict[method])
-            np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method),
-                    sampled_scores_dict[method])
-            np.save(args.output / experiment_name / ('sampled_labels_%s.npy' % method),
-                    sampled_labels_dict[method])
-            np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method),
-                    sampled_indices_dict[method])
+            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method), sampled_categories_dict[method])
+            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method), sampled_observations_dict[method])
+            np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method), sampled_scores_dict[method])
+            np.save(args.output / experiment_name / ('sampled_labels_%s.npy' % method), sampled_labels_dict[method])
+            np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method), sampled_indices_dict[method])
     else:
         # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts']:
-            sampled_categories_dict[method] = np.load(
-                args.output / experiment_name / ('sampled_categories_%s.npy' % method))
-            sampled_observations_dict[method] = np.load(
-                args.output / experiment_name / ('sampled_observations_%s.npy' % method))
+            sampled_categories_dict[method] = np.load(args.output / experiment_name / ('sampled_categories_%s.npy' % method))
+            sampled_observations_dict[method] = np.load(args.output / experiment_name / ('sampled_observations_%s.npy' % method))
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
 
     if EVAL:
-        logging.info('Starting evaluation')
+        logger.info('Starting evaluation')
         ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
                                         topk=args.topk)
-        for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['non-active'][r], \
-            cumulative_metric_dict['non-active'][r], \
-            non_cumulative_metric_dict['non-active'][r], \
-            holdout_ece_dict['non-active'][r] = eval(args,
-                                                     sampled_categories_dict['non-active'][r].tolist(),
-                                                     sampled_observations_dict['non-active'][r].tolist(),
-                                                     sampled_scores_dict['non-active'][r].tolist(),
-                                                     sampled_labels_dict['non-active'][r].tolist(),
-                                                     sampled_indices_dict['non-active'][r].tolist(),
-                                                     ground_truth,
-                                                     num_classes=num_classes,
-                                                     holdout_categories=holdout_categories,
-                                                     holdout_observations=holdout_observations,
-                                                     holdout_confidences=holdout_confidences,
-                                                     holdout_labels=holdout_labels,
-                                                     holdout_indices=holdout_indices,
-                                                     prior=None)
 
-            avg_num_agreement_dict['ts'][r], \
-            cumulative_metric_dict['ts'][r], \
-            non_cumulative_metric_dict['ts'][r], \
-            holdout_ece_dict['ts'][r] = eval(args,
-                                             sampled_categories_dict['ts'][r].tolist(),
-                                             sampled_observations_dict['ts'][r].tolist(),
-                                             sampled_scores_dict['ts'][r].tolist(),
-                                             sampled_labels_dict['ts'][r].tolist(),
-                                             sampled_indices_dict['ts'][r].tolist(),
-                                             ground_truth,
-                                             num_classes=num_classes,
-                                             holdout_categories=holdout_categories,
-                                             holdout_observations=holdout_observations,
-                                             holdout_confidences=holdout_confidences,
-                                             holdout_labels=holdout_labels,
-                                             holdout_indices=holdout_indices,
-                                             prior=None)
+        def eval_worker(queue):
+            while not queue.empty():
+                run_idx, method = queue.get()
+                with process_lock:
+                    logger.debug(f'Working on eval task :: Run: {run_idx} :: Method {method}')
+                agreement, metric, noncum_metric, ece = eval(args,
+                                                             sampled_categories_dict[method][run_idx].tolist(),
+                                                             sampled_observations_dict[method][run_idx].tolist(),
+                                                             sampled_scores_dict[method][run_idx].tolist(),
+                                                             sampled_labels_dict[method][run_idx].tolist(),
+                                                             sampled_indices_dict[method][run_idx].tolist(),
+                                                             ground_truth,
+                                                             num_classes=num_classes,
+                                                             holdout_categories=holdout_categories,
+                                                             holdout_observations=holdout_observations,
+                                                             holdout_confidences=holdout_confidences,
+                                                             holdout_labels=holdout_labels,
+                                                             holdout_indices=holdout_indices,
+                                                             prior=None)
+
+                # Write outputs
+                avg_num_agreement_array = avg_num_agreement_dict[method]
+                with avg_num_agreement_array.get_lock():
+                    arr = avg_num_agreement_array.get_array()
+                    arr[run_idx] = agreement
+                cumulative_metric_array = cumulative_metric_dict[method]
+                with cumulative_metric_array.get_lock():
+                    arr = cumulative_metric_array.get_array()
+                    arr[run_idx] = agreement
+                non_cumulative_metric_array = non_cumulative_metric_dict[method]
+                with non_cumulative_metric_array.get_lock():
+                    arr = non_cumulative_metric_array.get_array()
+                    arr[run_idx] = agreement
+                holdout_ece_array = holdout_ece_dict[method]
+                with holdout_ece_array.get_lock():
+                    arr = holdout_ece_array.get_array()
+                    arr[run_idx] = agreement
+
+                queue.task_done()
+
+        # Enqueue tasks
+        logger.debug('Enqueueing evaluation tasks')
+        eval_job_queue = JoinableQueue()
+        for i in range(RUNS):
+            eval_job_queue.put((i, 'non-active'))
+            eval_job_queue.put((i, 'ts'))
+
+        # Start tasks
+        logger.debug('Running evaluation tasks')
+        for _ in range(args.processes):
+            process = Process(target=eval_worker, args=(eval_job_queue,))
+            process.start()
+
+        # Make sure all work is done before proceeding
+        eval_job_queue.join()
+        logger.debug('Evaluation tasks finished')
+
+        # We want numpy arrays but instead have the weird custom process-safe arrays.
+        # Since the rest of the code expects a numpy array we're going to replace the
+        # elements in the dictionaries with their array counterparts.
+        for method in ['non-active', 'ts']:
+            with avg_num_agreement_dict[method].get_lock():
+                avg_num_agreement_dict[method] = avg_num_agreement_dict[method].get_array()
+            with cumulative_metric_dict[method].get_lock():
+                cumulative_metric_dict[method] = cumulative_metric_dict[method].get_array()
+            with non_cumulative_metric_dict[method].get_lock():
+                non_cumulative_metric_dict[method] = non_cumulative_metric_dict[method].get_array()
+            with holdout_ece_dict[method].get_lock():
+                holdout_ece_dict[method] = holdout_ece_dict[method].get_array()
 
         for method in ['non-active', 'ts']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
@@ -754,16 +780,22 @@ if __name__ == "__main__":
     parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
     parser.add_argument('--calibration_model', type=str, default=CALIBRATION_MODEL,
                         help='calibration models to apply on holdout data')
-    parser.add_argument('--sample_processes', type=int, default=4,
+    parser.add_argument('--processes', type=int, default=4,
                         help='Number of sample processes. Increase to speed up sampling.')
+    parser.add_argument('--debug', action='store_true', help='Enables debug statements')
 
     args, _ = parser.parse_known_args()
 
-    logging.basicConfig(level=logging.INFO)
+    if args.debug:
+        level = logging.DEBUG
+    else:
+        level = logging.INFO
+    logging.basicConfig(level=level)
+
     if args.dataset not in DATASET_LIST:
         raise ValueError("%s is not in DATASET_LIST." % args.dataset)
 
-    print(args.dataset, args.mode, '...')
+    logger.info(f'Dataset: {args.dataset} :: Model: {args.mode}')
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':

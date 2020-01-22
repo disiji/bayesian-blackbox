@@ -1,6 +1,7 @@
 import random
 from collections import deque
 from typing import List
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -25,8 +26,10 @@ def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
     w = np.array([(digitized == i).sum() for i in range(num_bins)])
     w = w / sum(w)
 
-    confidence_bins = np.array([confidences[digitized == i].mean() for i in range(num_bins)])
-    accuracy_bins = np.array([observations[digitized == i].mean() for i in range(num_bins)])
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        confidence_bins = np.array([confidences[digitized == i].mean() for i in range(num_bins)])
+        accuracy_bins = np.array([observations[digitized == i].mean() for i in range(num_bins)])
     confidence_bins[np.isnan(confidence_bins)] = 0
     accuracy_bins[np.isnan(accuracy_bins)] = 0
     diff = np.absolute(confidence_bins - accuracy_bins)

@@ -1,6 +1,10 @@
 import random
 import numpy as np
+import logging
 from typing import List
+
+logger = logging.getLogger(__name__)
+
 np.random.seed(0)
 
 datafile_dict = {
@@ -98,7 +102,7 @@ def prepare_data(filename, four_column=False):
         labels = list(data[:, 0])
         idx2category = None
         category2idx = None
-        print("Accuracy: %.3f" % (len([_ for _ in observations if _ == True]) * 1.0 / len(observations)))
+        logger.debug("Dataset Accuracy: %.3f" % (len([_ for _ in observations if _ == True]) * 1.0 / len(observations)))
 
     return categories, observations, confidences, idx2category, category2idx, labels
 
