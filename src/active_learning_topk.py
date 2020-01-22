@@ -24,7 +24,7 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
-RUNS = 100
+RUNS = 4
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
@@ -208,17 +208,30 @@ def eval(args: argparse.Namespace,
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
             else:
                 calibration_model = CALIBRATION_MODELS[args.calibration_model]()
-                X = np.array(confidences[:idx])
                 if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+                    X = np.array(confidences[:idx])
                     X = np.array([1 - X, X]).T
                     y = np.array(observations[:idx]) * 1
+                    calibration_model.fit(X, y)
+                    calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)[:, 1].tolist()
                 elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
                     X = logits[indices[:idx]]
                     y = np.array(labels[:idx], dtype=np.int)
-                calibration_model.fit(X, y)
-                calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)[:, 1].tolist()
+                    calibration_model.fit(X, y)
+
+                    pred_array = np.array(holdout_categories).astype(int).reshape(-1, 1)
+                    calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)
+                    calibrated_holdout_confidences = np.take_along_axis(calibrated_holdout_confidences, pred_array, axis=1).squeeze().tolist()
+                with process_lock:
+                    for x, x_recal, obs in zip(holdout_confidences, calibrated_holdout_confidences, holdout_observations):
+                        print(x, x_recal, obs)
+
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
+    with process_lock:
+        logger.debug(holdout_calibrated_ece)
+
+
 
     if args.metric == 'accuracy':
         return avg_num_agreement, cumulative_metric, non_cumulative_metric
@@ -704,15 +717,15 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 cumulative_metric_array = cumulative_metric_dict[method]
                 with cumulative_metric_array.get_lock():
                     arr = cumulative_metric_array.get_array()
-                    arr[run_idx] = agreement
+                    arr[run_idx] = metric
                 non_cumulative_metric_array = non_cumulative_metric_dict[method]
                 with non_cumulative_metric_array.get_lock():
                     arr = non_cumulative_metric_array.get_array()
-                    arr[run_idx] = agreement
+                    arr[run_idx] = noncum_metric
                 holdout_ece_array = holdout_ece_dict[method]
                 with holdout_ece_array.get_lock():
                     arr = holdout_ece_array.get_array()
-                    arr[run_idx] = agreement
+                    arr[run_idx] = ece
 
                 queue.task_done()
 
@@ -747,24 +760,16 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 holdout_ece_dict[method] = holdout_ece_dict[method].get_array()
 
         for method in ['non-active', 'ts']:
-            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
-                    avg_num_agreement_dict[method])
-            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
-                    cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
-                    non_cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('holdout_ece_%s.npy' % method),
-                    holdout_ece_dict[method])
+            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method), avg_num_agreement_dict[method])
+            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method), cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method), non_cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('holdout_ece_%s.npy' % method), holdout_ece_dict[method])
     else:
         for method in ['non-active', 'ts']:
-            avg_num_agreement_dict[method] = np.load(
-                args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-            cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-            non_cumulative_metric_dict[method] = np.load(
-                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
-            holdout_ece_dict[method] = np.load(
-                args.output / experiment_name / ('holdout_ece_%s.npy' % method))
+            avg_num_agreement_dict[method] = np.load(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
+            cumulative_metric_dict[method] = np.load(args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+            non_cumulative_metric_dict[method] = np.load(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            holdout_ece_dict[method] = np.load(args.output / experiment_name / ('holdout_ece_%s.npy' % method))
 
     if PLOT:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
@@ -799,4 +804,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
