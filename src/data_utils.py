@@ -12,6 +12,7 @@ datafile_dict = {
     'dbpedia': '../data/dbpedia/bert_dbpedia_outputs.txt',
 }
 
+
 logits_dict = {
     'cifar100': '../data/cifar100/resnet110_cifar100_logits.txt'
 }

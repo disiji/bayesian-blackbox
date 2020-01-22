@@ -27,7 +27,7 @@ RUNS = 100
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
-CALIBRATION_MODEL = 'histogram_binning'
+CALIBRATION_MODEL = 'temperature_scaling'
 HOLDOUT_RATIO = 0.1
 
 
@@ -132,11 +132,15 @@ def eval(args: argparse.Namespace,
     :param categories:
     :param observations:
     :param confidences:
+    :param labels:
+    :param indices:
     :param ground_truth:
     :param num_classes:
     :param holdout_categories:
     :param holdout_observations:
     :param holdout_confidences:
+    :param holdout_labels:
+    :param holdout_indices:
     :param prior:
     :param weight:
     :return avg_num_agreement: (num_samples, ) array.
@@ -158,22 +162,23 @@ def eval(args: argparse.Namespace,
     non_cumulative_metric = np.zeros((num_samples // LOG_FREQ + 1,))
 
     if args.metric == 'calibration_error':
+
         holdout_calibrated_ece = np.zeros((num_samples // CALIBRATION_FREQ + 1,))
 
+        if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+            holdout_X = np.array(holdout_confidences)
+            holdout_X = np.array([1 - holdout_X, holdout_X]).T
+        elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
+            holdout_indices_array = np.array(holdout_indices, dtype=np.int)
+            holdout_X = logits[holdout_indices_array]
+
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
-    holdout_X = np.array(holdout_confidences)
 
-    if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
-        holdout_X = np.array([1 - holdout_X, holdout_X]).T
-    elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
-        holdout_indices_array = np.array(holdout_indices, dtype=np.int)
-        holdout_X = logits[holdout_indices_array]
-
-    for idx, (category, observation, confidence, label, index) in enumerate(zip(categories, observations, confidences, labels, indices)):
+    for idx, (category, observation, confidence, label, index) in enumerate(
+            zip(categories, observations, confidences, labels, indices)):
 
         if args.metric == 'accuracy':
             model.update(category, observation)
-
         elif args.metric == 'calibration_error':
             model.update(category, observation, confidence)
 
@@ -192,7 +197,7 @@ def eval(args: argparse.Namespace,
             cumulative_metric[idx // LOG_FREQ] = model.frequentist_eval.mean()
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
 
-        if idx % CALIBRATION_FREQ == 0:
+        if args.metric == 'calibration_error' and idx % CALIBRATION_FREQ == 0:
             # before calibration
             if idx == 0:
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
@@ -282,7 +287,8 @@ def comparison_plot(args: argparse.Namespace,
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
 
-    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile_dict[args.dataset], False)
+    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
+        datafile_dict[args.dataset], False)
     indices = np.arange(len(categories))
 
     num_samples = len(observations)
@@ -343,54 +349,60 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], \
             sampled_scores_dict['non-active'][r], sampled_labels_dict['non-active'][r], \
             sampled_indices_dict['non-active'][r] = get_samples_topk(args,
-                                      categories,
-                                      observations,
-                                      confidences,
-                                      labels,
-                                      indices,
-                                      num_classes,
-                                      num_samples,
-                                      sample_method='random',
-                                      prior=UNIFORM_PRIOR,
-                                      random_seed=r)
-
-            sampled_categories_dict['ts_uniform'][r], sampled_observations_dict['ts_uniform'][r], \
-            sampled_scores_dict['ts_uniform'][r], sampled_labels_dict['ts_uniform'][r], \
-            sampled_indices_dict['ts_uniform'][r] = get_samples_topk(args,
-                                                                    categories,
-                                                                    observations,
-                                                                    confidences,
-                                                                    labels,
-                                                                    num_classes,
-                                                                    num_samples,
-                                                                    sample_method='ts',
-                                                                    prior=UNIFORM_PRIOR,
-                                                                    random_seed=r)
-
-            sampled_categories_dict['ts_informed'][r], sampled_observations_dict['ts_informed'][r], \
-            sampled_scores_dict['ts_informed'][r], sampled_labels_dict['ts_informed'][r], \
-            sampled_indices_dict['ts_informed'][r] = get_samples_topk(args,
                                                                      categories,
                                                                      observations,
                                                                      confidences,
                                                                      labels,
+                                                                     indices,
+                                                                     num_classes,
+                                                                     num_samples,
+                                                                     sample_method='random',
+                                                                     prior=UNIFORM_PRIOR,
+                                                                     random_seed=r)
+
+            sampled_categories_dict['ts_uniform'][r], sampled_observations_dict['ts_uniform'][r], \
+            sampled_scores_dict['ts_uniform'][r], sampled_labels_dict['ts_uniform'][r], \
+            sampled_indices_dict['ts_uniform'][r] = get_samples_topk(args,
+                                                                     categories,
+                                                                     observations,
+                                                                     confidences,
+                                                                     labels,
+                                                                     indices,
                                                                      num_classes,
                                                                      num_samples,
                                                                      sample_method='ts',
-                                                                     prior=INFORMED_PRIOR,
+                                                                     prior=UNIFORM_PRIOR,
                                                                      random_seed=r)
+
+            sampled_categories_dict['ts_informed'][r], sampled_observations_dict['ts_informed'][r], \
+            sampled_scores_dict['ts_informed'][r], sampled_labels_dict['ts_informed'][r], \
+            sampled_indices_dict['ts_informed'][r] = get_samples_topk(args,
+                                                                      categories,
+                                                                      observations,
+                                                                      confidences,
+                                                                      labels,
+                                                                      indices,
+                                                                      num_classes,
+                                                                      num_samples,
+                                                                      sample_method='ts',
+                                                                      prior=INFORMED_PRIOR,
+                                                                      random_seed=r)
         # write samples to file
         for method in ['non-active', 'ts_uniform', 'ts_informed']:
-            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method), sampled_categories_dict[method])
-            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method), sampled_observations_dict[method])
+            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
+                    sampled_categories_dict[method])
+            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
+                    sampled_observations_dict[method])
             np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method), sampled_scores_dict[method])
             np.save(args.output / experiment_name / ('sampled_labels_%s.npy' % method), sampled_labels_dict[method])
             np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method), sampled_indices_dict[method])
     else:
         # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts_uniform', 'ts_informed']:
-            sampled_categories_dict[method] = np.load( args.output / experiment_name / ('sampled_categories_%s.npy' % method))
-            sampled_observations_dict[method] = np.load( args.output / experiment_name / ('sampled_observations_%s.npy' % method))
+            sampled_categories_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_categories_%s.npy' % method))
+            sampled_observations_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_observations_%s.npy' % method))
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
@@ -433,14 +445,20 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                 prior=INFORMED_PRIOR)
 
         for method in ['non-active', 'ts_uniform', 'ts_informed']:
-            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method), avg_num_agreement_dict[method])
-            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method), cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method), non_cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
+                    avg_num_agreement_dict[method])
+            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
+                    cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
+                    non_cumulative_metric_dict[method])
     else:
         for method in ['non-active', 'ts_uniform', 'ts_informed']:
-            avg_num_agreement_dict[method] = np.load( args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-            cumulative_metric_dict[method] = np.load( args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-            non_cumulative_metric_dict[method] = np.load( args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            avg_num_agreement_dict[method] = np.load(
+                args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
+            cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+            non_cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
 
     if PLOT:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
@@ -479,10 +497,12 @@ class MpSafeSharedArray:
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
 
-    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile_dict[args.dataset], False)
+    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
+        datafile_dict[args.dataset], False)
 
     global logits
-    logits_path = logits_dict.get(args.dataset, None)  # Since we haven't created all the logits yet, assign defaul value of None.
+    logits_path = logits_dict.get(args.dataset,
+                                  None)  # Since we haven't created all the logits yet, assign defaul value of None.
     if logits_path is not None:
         logits = np.genfromtxt(logits_path)[:, 1:]
     else:
@@ -490,9 +510,9 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
 
     indices = np.arange(len(categories))
 
-    categories, observations, confidences, labels, indices, holdout_categories, holdout_observations, holdout_confidences, holdout_labels, holdout_indices = train_holdout_split(
-        categories, observations, confidences, labels, indices,
-        holdout_ratio=HOLDOUT_RATIO)
+    categories, observations, confidences, labels, indices, \
+    holdout_categories, holdout_observations, holdout_confidences, holdout_labels, holdout_indices = \
+        train_holdout_split(categories, observations, confidences, labels, indices, holdout_ratio=HOLDOUT_RATIO)
 
     num_samples = len(observations)
 
@@ -556,17 +576,18 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 else:
                     method = sample_method
 
-                sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices = get_samples_topk(args,
-                                                                                            categories,
-                                                                                            observations,
-                                                                                            confidences,
-                                                                                            labels,
-                                                                                            indices,
-                                                                                            num_classes,
-                                                                                            num_samples,
-                                                                                            sample_method=method,
-                                                                                            prior=None,
-                                                                                            random_seed=run_idx)
+                sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices = \
+                    get_samples_topk(args,
+                                     categories,
+                                     observations,
+                                     confidences,
+                                     labels,
+                                     indices,
+                                     num_classes,
+                                     num_samples,
+                                     sample_method=method,
+                                     prior=None,
+                                     random_seed=run_idx)
                 category_array = sampled_categories_dict[sample_method]
                 with category_array.get_lock():
                     arr = category_array.get_array()
@@ -650,15 +671,18 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     else:
         # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts']:
-            sampled_categories_dict[method] = np.load(args.output / experiment_name / ('sampled_categories_%s.npy' % method))
-            sampled_observations_dict[method] = np.load(args.output / experiment_name / ('sampled_observations_%s.npy' % method))
+            sampled_categories_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_categories_%s.npy' % method))
+            sampled_observations_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_observations_%s.npy' % method))
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
 
     if EVAL:
         logging.info('Starting evaluation')
-        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode, topk=args.topk)
+        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
+                                        topk=args.topk)
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['non-active'][r], \
             cumulative_metric_dict['non-active'][r], \
@@ -743,4 +767,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
