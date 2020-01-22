@@ -28,6 +28,7 @@ LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
 CALIBRATION_MODEL = 'histogram_binning'
+HOLDOUT_RATIO = 0.1
 
 
 def get_samples_topk(args: argparse.Namespace,
@@ -152,7 +153,12 @@ def eval(args: argparse.Namespace,
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
     holdout_X = np.array(holdout_confidences)
-    holdout_X = np.array([1 - holdout_X, holdout_X]).T
+
+    if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+        holdout_X = np.array([1 - holdout_X, holdout_X]).T
+    elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
+        # todo: Robby, load the logits from here
+        # holdout_X = ...
 
     for idx, (category, observation, confidence) in enumerate(zip(categories, observations, confidences)):
 
@@ -182,10 +188,14 @@ def eval(args: argparse.Namespace,
             if idx == 0:
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
             else:
-                calibration_model = CALIBRATION_MODELS[args.calibration_model](mode='equal_width')
+                calibration_model = CALIBRATION_MODELS[args.calibration_model]()
                 X = np.array(confidences[:idx])
-                X = np.array([1 - X, X]).T
-                y = np.array(observations[:idx]) * 1.0
+                if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+                    X = np.array([1 - X, X]).T
+                elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
+                    # todo: Robby, load the logits from here
+                    # X = ...
+                y = np.array(observations[:idx]) * 1
 
                 calibration_model.fit(X, y)
                 calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)[:, 1].tolist()
@@ -446,7 +456,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
     categories, observations, confidences, holdout_categories, holdout_observations, holdout_confidences = train_holdout_split(
         categories, observations, confidences,
-        holdout_ratio=0.2)
+        holdout_ratio=HOLDOUT_RATIO)
 
     num_samples = len(observations)
 
@@ -662,4 +672,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)

@@ -442,7 +442,7 @@ class HistogramBinning(CalibrationMethod):
     """
 
 
-    def __init__(self, mode='equal_freq', n_bins=20, input_range=[0, 1]):
+    def __init__(self, mode='equal_width', n_bins=20, input_range=[0, 1]):
         super().__init__()
         if mode in ['equal_width', 'equal_freq']:
             self.mode = mode
