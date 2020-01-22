@@ -144,7 +144,7 @@ class TemperatureScaling(CalibrationMethod):
     .. [1] On calibration of modern neural networks, C. Guo, G. Pleiss, Y. Sun, K. Weinberger, ICML 2017
     """
 
-    def __init__(self, T_init=1, verbose=False):
+    def __init__(self, T_init=1.0, verbose=False):
         super().__init__()
         if T_init <= 0:
             raise ValueError("Temperature not greater than 0.")
