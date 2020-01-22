@@ -13,7 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
-from data_utils import datafile_dict, num_classes_dict, DATASET_LIST, prepare_data, train_holdout_split
+from data_utils import datafile_dict, num_classes_dict, logits_dict, DATASET_LIST, prepare_data, train_holdout_split
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
 
@@ -35,6 +35,7 @@ def get_samples_topk(args: argparse.Namespace,
                      categories: List[int],
                      observations: List[bool],
                      confidences: List[float],
+                     labels: List[int],
                      num_classes: int,
                      num_samples: int,
                      sample_method: str,
@@ -51,17 +52,18 @@ def get_samples_topk(args: argparse.Namespace,
         model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
 
     deques = [deque() for _ in range(num_classes)]
-    for (category, score, observation) in zip(categories, confidences, observations):
+    for (category, score, observation, label) in zip(categories, confidences, observations, labels):
         if args.metric == 'accuracy':
             deques[category].append(observation)
         elif args.metric == 'calibration_error':
-            deques[category].append((observation, score))
+            deques[category].append((observation, score, label))
     for _deque in deques:
         random.shuffle(_deque)
 
     sampled_categories = np.zeros((num_samples,), dtype=np.int)
     sampled_observations = np.zeros((num_samples,), dtype=np.int)
     sampled_scores = np.zeros((num_samples,), dtype=np.float)
+    sampled_labels = np.zeros((num_samples,), dtype=np.int)
     sample_fct = SAMPLE_CATEGORY[sample_method]
 
     topk = args.topk
@@ -93,16 +95,17 @@ def get_samples_topk(args: argparse.Namespace,
                 model.update(category, observation)
 
             elif args.metric == 'calibration_error':
-                observation, score = deques[category].pop()
+                observation, score, label = deques[category].pop()
                 model.update(category, observation, score)
                 sampled_scores[idx] = score
+                sampled_labels[idx] = label
 
             sampled_categories[idx] = category
             sampled_observations[idx] = observation
 
             idx += 1
 
-    return sampled_categories, sampled_observations, sampled_scores
+    return sampled_categories, sampled_observations, sampled_scores, sampled_labels
 
 
 def eval(args: argparse.Namespace,
@@ -274,7 +277,7 @@ def comparison_plot(args: argparse.Namespace,
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
 
-    categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
+    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile_dict[args.dataset], False)
 
     num_samples = len(observations)
 
@@ -322,11 +325,11 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     if SAMPLE:
         for r in tqdm(range(RUNS)):
             sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], \
-            sampled_scores_dict['non-active'][
-                r] = get_samples_topk(args,
+            sampled_scores_dict['non-active'][r], _ = get_samples_topk(args,
                                       categories,
                                       observations,
                                       confidences,
+                                      labels,
                                       num_classes,
                                       num_samples,
                                       sample_method='random',
@@ -334,10 +337,11 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                       random_seed=r)
 
             sampled_categories_dict['ts_uniform'][r], sampled_observations_dict['ts_uniform'][r], \
-            sampled_scores_dict['ts_uniform'][r] = get_samples_topk(args,
+            sampled_scores_dict['ts_uniform'][r], _ = get_samples_topk(args,
                                                                     categories,
                                                                     observations,
                                                                     confidences,
+                                                                    labels,
                                                                     num_classes,
                                                                     num_samples,
                                                                     sample_method='ts',
@@ -345,10 +349,11 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                     random_seed=r)
 
             sampled_categories_dict['ts_informed'][r], sampled_observations_dict['ts_informed'][r], \
-            sampled_scores_dict['ts_informed'][r] = get_samples_topk(args,
+            sampled_scores_dict['ts_informed'][r], _ = get_samples_topk(args,
                                                                      categories,
                                                                      observations,
                                                                      confidences,
+                                                                     labels,
                                                                      num_classes,
                                                                      num_samples,
                                                                      sample_method='ts',
@@ -453,7 +458,11 @@ class MpSafeSharedArray:
 
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
-    categories, observations, confidences, idx2category, category2idx = prepare_data(datafile_dict[args.dataset], False)
+
+    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile_dict[args.dataset], False)
+    logits_path = logits_dict.get(args.dataset, None)  # Since we haven't created all the logits yet, assign defaul value of None.
+    logits = np.genfromtxt(logits_path)[:, 1:]
+
     categories, observations, confidences, holdout_categories, holdout_observations, holdout_confidences = train_holdout_split(
         categories, observations, confidences,
         holdout_ratio=HOLDOUT_RATIO)
@@ -476,6 +485,10 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
     sampled_scores_dict = {
         'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
         'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
+    }
+    sampled_labels_dict = {
+        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
 
     avg_num_agreement_dict = {
@@ -512,10 +525,11 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 else:
                     method = sample_method
 
-                sampled_categories, sampled_observations, sampled_scores = get_samples_topk(args,
+                sampled_categories, sampled_observations, sampled_scores, sampled_labels = get_samples_topk(args,
                                                                                             categories,
                                                                                             observations,
                                                                                             confidences,
+                                                                                            labels,
                                                                                             num_classes,
                                                                                             num_samples,
                                                                                             sample_method=method,
@@ -535,6 +549,11 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 with score_array.get_lock():
                     arr = score_array.get_array()
                     arr[run_idx] = sampled_scores
+
+                label_array = sampled_labels_dict[sample_method]
+                with label_array.get_lock():
+                    arr = label_array.get_array()
+                    arr[run_idx] = sampled_labels
 
                 queue.task_done()
 
@@ -574,6 +593,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 sampled_observations_dict[method] = sampled_observations_dict[method].get_array()
             with sampled_scores_dict[method].get_lock():
                 sampled_scores_dict[method] = sampled_scores_dict[method].get_array()
+            with sampled_labels_dict[method].get_lock():
+                sampled_labels_dict[method] = sampled_labels_dict[method].get_array()
 
         # Write to disk
         for method in ['non-active', 'ts']:
@@ -583,6 +604,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                     sampled_observations_dict[method])
             np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method),
                     sampled_scores_dict[method])
+            np.save(args.output / experiment_name / ('sampled_labels_%s.npy' % method),
+                    sampled_labels_dict[method])
     else:
         # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts']:
@@ -591,6 +614,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             sampled_observations_dict[method] = np.load(
                 args.output / experiment_name / ('sampled_observations_%s.npy' % method))
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
+            sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
 
     if EVAL:
         logging.info('Starting evaluation')
@@ -672,4 +696,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)

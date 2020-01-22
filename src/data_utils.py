@@ -12,6 +12,10 @@ datafile_dict = {
     'dbpedia': '../data/dbpedia/bert_dbpedia_outputs.txt',
 }
 
+logits_dict = {
+    'cifar100': '../data/cifar100/resnet110_cifar100_logits.txt'
+}
+
 datasize_dict = {
     'cifar100': 10000,
     'imagenet': 50000,
@@ -71,6 +75,7 @@ def prepare_data(filename, four_column=False):
             categories = []
             observations = []
             confidences = []
+            labels = []
             next(f)
             for line in f:
                 _, correct, predicted, confidence = line.split()
@@ -81,6 +86,7 @@ def prepare_data(filename, four_column=False):
                 categories.append(idx)
                 observations.append(correct == predicted)
                 confidences.append(float(confidence))
+                labels.append(correct)
 
     else:
         data = np.genfromtxt(filename)
@@ -88,10 +94,12 @@ def prepare_data(filename, four_column=False):
         confidences = list(np.max(data[:, 1:], axis=1).astype(float))
         observations = list((categories == data[:, 0]))
         categories = list(categories)
+        labels = list(data[:, 0])
         idx2category = None
         category2idx = None
         print("Accuracy: %.3f" % (len([_ for _ in observations if _ == True]) * 1.0 / len(observations)))
-    return categories, observations, confidences, idx2category, category2idx
+
+    return categories, observations, confidences, idx2category, category2idx, labels
 
 
 def train_holdout_split(categories: List[int], observations: List[bool], confidences: List[float],
