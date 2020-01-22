@@ -12,6 +12,10 @@ datafile_dict = {
     'dbpedia': '../data/dbpedia/bert_dbpedia_outputs.txt',
 }
 
+logits_dict = {
+    'cifar100': '../data/cifar100/resnet110_cifar100_logits.txt'
+}
+
 datasize_dict = {
     'cifar100': 10000,
     'imagenet': 50000,
@@ -71,6 +75,7 @@ def prepare_data(filename, four_column=False):
             categories = []
             observations = []
             confidences = []
+            labels = []
             next(f)
             for line in f:
                 _, correct, predicted, confidence = line.split()
@@ -81,6 +86,7 @@ def prepare_data(filename, four_column=False):
                 categories.append(idx)
                 observations.append(correct == predicted)
                 confidences.append(float(confidence))
+                labels.append(correct)
 
     else:
         data = np.genfromtxt(filename)
@@ -88,29 +94,39 @@ def prepare_data(filename, four_column=False):
         confidences = list(np.max(data[:, 1:], axis=1).astype(float))
         observations = list((categories == data[:, 0]))
         categories = list(categories)
+        labels = list(data[:, 0])
         idx2category = None
         category2idx = None
         print("Accuracy: %.3f" % (len([_ for _ in observations if _ == True]) * 1.0 / len(observations)))
-    return categories, observations, confidences, idx2category, category2idx
+
+    return categories, observations, confidences, idx2category, category2idx, labels
 
 
-def train_holdout_split(categories: List[int], observations: List[bool], confidences: List[float],
+def train_holdout_split(categories: List[int],
+                        observations: List[bool],
+                        confidences: List[float],
+                        labels: List[int],
+                        indices: List[int],
                         holdout_ratio: float = 0.2):
     """
     Split categories, observations and confidences into train and holdout with hold_ratio.
     """
     num_samples = len(categories)
 
-    indices = np.random.permutation(num_samples)
+    permutation = np.random.permutation(num_samples)
     mask = np.zeros(num_samples)
-    mask[indices[:int(len(categories) * holdout_ratio)]] = 1
+    mask[permutation[:int(len(categories) * holdout_ratio)]] = 1
 
     train_categories = [categories[idx] for idx in range(num_samples) if mask[idx] == 0]
     train_observations = [observations[idx] for idx in range(num_samples) if mask[idx] == 0]
     train_confidences = [confidences[idx] for idx in range(num_samples) if mask[idx] == 0]
+    train_labels = [labels[idx] for idx in range(num_samples) if mask[idx] == 0]
+    train_indices = [indices[idx] for idx in range(num_samples) if mask[idx] == 0]
 
     holdout_categories = [categories[idx] for idx in range(num_samples) if mask[idx] == 1]
     holdout_observations = [observations[idx] for idx in range(num_samples) if mask[idx] == 1]
     holdout_confidences = [confidences[idx] for idx in range(num_samples) if mask[idx] == 1]
+    holdout_labels = [labels[idx] for idx in range(num_samples) if mask[idx] == 1]
+    holdout_indices = [indices[idx] for idx in range(num_samples) if mask[idx] == 1]
 
-    return train_categories, train_observations, train_confidences, holdout_categories, holdout_observations, holdout_confidences
+    return train_categories, train_observations, train_confidences, train_labels, train_indices, holdout_categories, holdout_observations, holdout_confidences, holdout_labels, holdout_indices
