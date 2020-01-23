@@ -125,7 +125,7 @@ class SumOfBetaEce(Model):
     prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
     """
 
-    def __init__(self, num_bins: int, weight: np.ndarray = None, prior_alpha: np.ndarray = None,
+    def __init__(self, num_bins: int, peusdo_count: int = 10, weight: np.ndarray = None, prior_alpha: np.ndarray = None,
                  prior_beta: np.ndarray = None):
         """
 
@@ -144,7 +144,6 @@ class SumOfBetaEce(Model):
         self._confidence = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
 
         # initialize the mode of each Beta distribution on diagonal
-        peusdo_count = 10
         if prior_alpha is None:
             self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
         else:
@@ -156,6 +155,7 @@ class SumOfBetaEce(Model):
                  range(self._num_bins)])
         else:
             self._beta = np.copy(prior_beta)
+
 
     @property
     def eval(self) -> float:
