@@ -18,7 +18,8 @@ datafile_dict = {
 
 
 logits_dict = {
-    'cifar100': '../data/cifar100/resnet110_cifar100_logits.txt'
+    'cifar100': '../data/cifar100/resnet110_cifar100_logits.txt',
+    'imagenet': '../data/imagenet/resnet110_imagenet_logits.txt',
 }
 
 datasize_dict = {
