@@ -1,7 +1,6 @@
 import argparse
 import ctypes
 import logging
-import multiprocessing
 import pathlib
 import random
 import warnings
@@ -14,7 +13,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
-from data_utils import datafile_dict, num_classes_dict, logits_dict, DATASET_LIST, prepare_data, train_holdout_split
+from data_utils import datafile_dict, num_classes_dict, logits_dict, datasize_dict, prepare_data, train_holdout_split, \
+    DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
 from tqdm import tqdm
 
@@ -23,12 +23,12 @@ TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
-OUTPUT_DIR = "../output_from_anvil/active_learning_topk"
+OUTPUT_DIR = "../output/active_learning_topk"
 RUNS = 100
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 5
-CALIBRATION_MODEL = 'temperature_scaling'
+CALIBRATION_MODEL = 'histogram_binning'
 HOLDOUT_RATIO = 0.1
 
 logger = logging.getLogger(__name__)
@@ -221,17 +221,13 @@ def eval(args: argparse.Namespace,
 
                     pred_array = np.array(holdout_categories).astype(int).reshape(-1, 1)
                     calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)
-                    calibrated_holdout_confidences = np.take_along_axis(calibrated_holdout_confidences, pred_array, axis=1).squeeze().tolist()
-                with process_lock:
-                    for x, x_recal, obs in zip(holdout_confidences, calibrated_holdout_confidences, holdout_observations):
-                        print(x, x_recal, obs)
+                    calibrated_holdout_confidences = np.take_along_axis(calibrated_holdout_confidences, pred_array,
+                                                                        axis=1).squeeze().tolist()
 
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
     with process_lock:
         logger.debug(holdout_calibrated_ece)
-
-
 
     if args.metric == 'accuracy':
         return avg_num_agreement, cumulative_metric, non_cumulative_metric
@@ -243,16 +239,19 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
     # If labels are getting cut off make the figsize smaller
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
 
+    total_samples = datasize_dict[args.dataset] * (1 - HOLDOUT_RATIO)
+
     for method_name, metric_eval in eval_result_dict.items():
-        metric_eval = metric_eval[:-1]
-        x = np.arange(len(metric_eval)) * eval_freq
+        # metric_eval = metric_eval[: int(len(metric_eval) / 2)]
+        x = np.arange(len(metric_eval)) * eval_freq / total_samples
         plt.plot(x, metric_eval, label=method_name)
-    plt.xlabel('#Queries')
+    plt.xlabel('#Percentage')
     plt.ylabel(ylabel)
     plt.legend()
     plt.yticks(fontsize=FONT_SIZE)
     plt.xticks(fontsize=FONT_SIZE)
     # plt.ylim(0.0, 1.0)
+    plt.xlim(0.0, 0.5)
     plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
 
 
@@ -299,7 +298,7 @@ def comparison_plot(args: argparse.Namespace,
                      ('Non cumulative %s' % args.metric))
     if holdout_ece_dict:
         _comparison_plot(holdout_ece_dict, CALIBRATION_FREQ,
-                         args.output / experiment_name / "holdout_ece.pdf", 'ECE')
+                         args.output / experiment_name / ("holdout_ece_%s.pdf" % args.calibration_model), 'ECE')
 
 
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -515,9 +514,6 @@ class MpSafeSharedArray:
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
     num_classes = num_classes_dict[args.dataset]
 
-    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
-        datafile_dict[args.dataset], False)
-
     global logits
     logits_path = logits_dict.get(args.dataset,
                                   None)  # Since we haven't created all the logits yet, assign defaul value of None.
@@ -527,6 +523,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         logits = None
     logits_lock = Lock()
 
+    categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
+        datafile_dict[args.dataset], False)
     indices = np.arange(len(categories))
 
     categories, observations, confidences, labels, indices, \
@@ -670,16 +668,20 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
 
         # Write to disk
         for method in ['non-active', 'ts']:
-            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method), sampled_categories_dict[method])
-            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method), sampled_observations_dict[method])
+            np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
+                    sampled_categories_dict[method])
+            np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
+                    sampled_observations_dict[method])
             np.save(args.output / experiment_name / ('sampled_scores_%s.npy' % method), sampled_scores_dict[method])
             np.save(args.output / experiment_name / ('sampled_labels_%s.npy' % method), sampled_labels_dict[method])
             np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method), sampled_indices_dict[method])
     else:
         # load sampled categories, scores and observations from file
         for method in ['non-active', 'ts']:
-            sampled_categories_dict[method] = np.load(args.output / experiment_name / ('sampled_categories_%s.npy' % method))
-            sampled_observations_dict[method] = np.load(args.output / experiment_name / ('sampled_observations_%s.npy' % method))
+            sampled_categories_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_categories_%s.npy' % method))
+            sampled_observations_dict[method] = np.load(
+                args.output / experiment_name / ('sampled_observations_%s.npy' % method))
             sampled_scores_dict[method] = np.load(args.output / experiment_name / ('sampled_scores_%s.npy' % method))
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
@@ -760,16 +762,24 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 holdout_ece_dict[method] = holdout_ece_dict[method].get_array()
 
         for method in ['non-active', 'ts']:
-            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method), avg_num_agreement_dict[method])
-            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method), cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method), non_cumulative_metric_dict[method])
-            np.save(args.output / experiment_name / ('holdout_ece_%s.npy' % method), holdout_ece_dict[method])
+            np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
+                    avg_num_agreement_dict[method])
+            np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
+                    cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
+                    non_cumulative_metric_dict[method])
+            np.save(args.output / experiment_name / ('holdout_ece_%s_%s.npy' % (args.calibration_model, method)),
+                    holdout_ece_dict[method])
     else:
         for method in ['non-active', 'ts']:
-            avg_num_agreement_dict[method] = np.load(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
-            cumulative_metric_dict[method] = np.load(args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
-            non_cumulative_metric_dict[method] = np.load(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
-            holdout_ece_dict[method] = np.load(args.output / experiment_name / ('holdout_ece_%s.npy' % method))
+            avg_num_agreement_dict[method] = np.load(
+                args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
+            cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('cumulative_metric_%s.npy' % method))
+            non_cumulative_metric_dict[method] = np.load(
+                args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method))
+            holdout_ece_dict[method] = np.load(
+                args.output / experiment_name / ('holdout_ece_%s_%s.npy' % (args.calibration_model, method)))
 
     if PLOT:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, cumulative_metric_dict,
@@ -804,4 +814,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
