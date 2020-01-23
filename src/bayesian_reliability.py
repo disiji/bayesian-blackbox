@@ -125,9 +125,9 @@ def plot_bayesian_reliability_diagram(args: argparse.Namespace,
                  yerr=(output['beta_posteriors_mean'] - output['beta_posterior_p025'],
                        output['beta_posterior_p975'] - output['beta_posteriors_mean']),
                  fmt='o', color='r', label="Bayesian")
-    ax1.plot(np.linspace(0, 1, 11), linestyle="--", linewidth=3, c="gray")
+    ax1.plot(np.linspace(0, 1, args.num_bins + 1), linestyle="--", linewidth=3, c="gray")
     ax1.fill_between([i + 0.5 for i in range(args.num_bins)], output['beta_posteriors_mean'], \
-                     np.linspace(0, 1, 11)[:-1] + 0.05, color="gray", alpha=0.3)
+                     np.linspace(0, 1, args.num_bins + 1)[:-1] + 0.05, color="gray", alpha=0.3)
     # ax1.legend(loc='upper left', prop={'size': 10})
     ax1.set_xlim((0.0, args.num_bins))
     ax1.set_xlabel("Score(Model Confidence)", fontsize=14)

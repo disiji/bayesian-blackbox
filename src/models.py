@@ -125,7 +125,8 @@ class SumOfBetaEce(Model):
     prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
     """
 
-    def __init__(self, num_bins: int, weight: None, prior_alpha: None, prior_beta: None):
+    def __init__(self, num_bins: int, weight: np.ndarray = None, prior_alpha: np.ndarray = None,
+                 prior_beta: np.ndarray = None):
         """
 
         :param num_bins:
@@ -140,10 +141,10 @@ class SumOfBetaEce(Model):
 
         # parameters to update:
         self._counts = np.ones((num_bins, 2)) * 0.0001
-        self._confidence = np.zeros((num_bins,))
+        self._confidence = np.array([(i + 0.5) / num_bins for i in range(0, num_bins)])
 
         # initialize the mode of each Beta distribution on diagonal
-        peusdo_count = 5
+        peusdo_count = 10
         if prior_alpha is None:
             self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
         else:
@@ -157,44 +158,55 @@ class SumOfBetaEce(Model):
             self._beta = np.copy(prior_beta)
 
     @property
-    def eval(self):
+    def eval(self) -> float:
+        """
+        Eval MPE of ECE by taking the weighted absolute difference between MPE of bin-wise theta and confidence.
+        :return: float
+        """
         theta = self._alpha / (self._alpha + self._beta)
         if self._weight is not None:  # pool weights
             weight = self._weight
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
             weight = tmp / sum(tmp)
-
-        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
+        return np.dot(np.abs(theta - self._confidence), weight)
 
     @property
-    def variance(self):
+    def variance(self) -> float:
+        """
+        Eval variance of posterior of ECE.
+        :return:
+        """
         variance_bin = beta.var(self._alpha, self._beta)
         if self._weight is not None:  # pool weights
             weight = self._weight
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
             weight = tmp / sum(tmp)
-        return np.inner(weight * weight, variance_bin)
+        return np.dot(weight * weight, variance_bin)
 
     @property
-    def frequentist_eval(self):
+    def frequentist_eval(self) -> None:
+        """
+        Eval ECE in a frequentist's way
+
+        :return:
+        """
         tmp = np.sum(self._counts, axis=1)
         accuracy = self._counts[:, 0] / tmp
         weight = tmp / sum(tmp)
-        return np.dot(np.abs(accuracy - self._confidence), weight).squeeze()
+        return np.dot(np.abs(accuracy - self._confidence), weight)
+
+    def get_params(self):
+        return self._alpha, self._beta
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample ECEs from posterior.
 
-        Parameters
-        ==========
-        num_samples : int
+        :param num_samples : int
             Number of times to sample from posterior. Default: 1.
 
-        Returns
-        =======
-        An (num_samples, ) array of ECE. If n_samples == 1 then last dimension is squeezed.
+        :return: An (num_samples, ) array of ECE. If n_samples == 1 then last dimension is squeezed.
         """
 
         # draw samples from each Beta distribution
@@ -206,14 +218,14 @@ class SumOfBetaEce(Model):
         else:  # online weights
             tmp = np.sum(self._counts, axis=1)
             weight = tmp / sum(tmp)
-        return np.dot(np.abs(theta - self._confidence), weight).squeeze()
+        return np.dot(np.abs(theta - self._confidence), weight)
 
-    def update(self, score: float, observation: bool):
+    def update(self, score: float, observation: bool) -> None:
         """
+        Update the model parameters with one labeled sample (score, observation).
 
-        :param score:
-        :param prediction:
-        :return:
+        :param score: float, confidence of the prediction
+        :param observation: bool, whether predicted label is the same as true label
         """
         bin_idx = math.floor(score * self._num_bins)
         if score == 1:
@@ -229,7 +241,7 @@ class SumOfBetaEce(Model):
 
     def update_batch(self, scores: List[float], observations: List[bool]):
         """
-
+        Update the model parameters with a batch of labeled sample.
         :param scores:
         :param observations:
         :return:
