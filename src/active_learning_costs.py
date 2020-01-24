@@ -311,7 +311,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Sampling...
     for i in tqdm(range(N_SIMULATIONS)):
-        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount
+        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-6
         model = DirichletMultinomialCost(alphas, costs)
         random_results[i], random_confusion_log = select_and_label(dataset=dataset,
                                                                    model=model,
@@ -340,11 +340,15 @@ def main(args: argparse.Namespace) -> None:
     # Dump results...
     np.save(args.output / f'random_success_top{args.topk}_pseudocount{args.pseudocount}.npy', random_success)
     np.save(args.output / f'active_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_success)
-    np.save(args.output / f'active_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_informed_success)
+    np.save(args.output / f'active_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            active_informed_success)
 
-    np.save(args.output / f'random_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', random_confusion_log)
-    np.save(args.output / f'active_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', active_confusion_log)
-    np.save(args.output / f'active_informed_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', active_informed_confusion_log)
+    np.save(args.output / f'random_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_confusion_log)
+    np.save(args.output / f'active_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            active_confusion_log)
+    np.save(args.output / f'active_informed_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            active_informed_confusion_log)
 
     # Plot..
     fig, axes = plt.subplots(1, 1)
@@ -373,7 +377,7 @@ if __name__ == '__main__':
     parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
     parser.add_argument('-type_cost', type=str, default=None, help='human or superclass')
-    parser.add_argument('-pseudocount', type=int, default=1, help='pseudocount per row for confusion matrix.')
+    parser.add_argument('-pseudocount', type=float, default=1, help='pseudocount per row for confusion matrix.')
     parser.add_argument('-k', type=float, default=2, help='relative cost')
     parser.add_argument('--superclass', action='store_true')
 
