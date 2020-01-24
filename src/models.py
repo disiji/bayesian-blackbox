@@ -409,11 +409,15 @@ class DirichletMultinomialCost(Model):
         return expected_costs.squeeze()
 
     def mpe(self) -> np.ndarray:
-        """Mean posterior estimate of expected costs, computed using Monte Carlo sampling"""
+        """Mean posterior estimate of expected costs"""
         z = self._alphas.sum(axis=-1, keepdims=True)
         expected_probs = self._alphas / z
         expected_costs = (self._costs * expected_probs).sum(axis=-1)
         return expected_costs
+
+    def confusion_matrix(self) -> np.ndarray:
+        z = self._alphas.sum(axis=-1, keepdims=True)
+        return self._alphas / z
 
 
 class SpikeAndBetaSlab(Model):

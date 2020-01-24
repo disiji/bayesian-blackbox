@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-LOG_FREQ = 1
+LOG_FREQ = 100
 N_SIMULATIONS = 100
 
 
@@ -198,6 +198,7 @@ def select_and_label(dataset: Dataset,
     n_samples = len(dataset)
 
     mpe = np.zeros((n_samples // LOG_FREQ, dataset.num_classes))
+    confusion_log = np.zeros((n_samples // LOG_FREQ, dataset.num_classes, dataset.num_classes))
 
     # Run experiment
     i = 0
@@ -218,11 +219,12 @@ def select_and_label(dataset: Dataset,
             if not i % LOG_FREQ:
                 index = i // LOG_FREQ - 1
                 mpe[index] = model.mpe()
+                confusion_log[index] = model.confusion_matrix()
 
     # In case we're one short
     mpe[-1] = model.mpe()
 
-    return mpe
+    return mpe, confusion_log
 
 
 def pretty_print(arr):
@@ -231,20 +233,22 @@ def pretty_print(arr):
         print(out)
 
 
-def eval(results: np.ndarray, highest_cost_classes: list, topk: int) -> Dict[str, np.ndarray]:
+def eval(results: np.ndarray, ground_truth: list, topk: int) -> Dict[str, np.ndarray]:
     """
 
     :param results:(num_runs, num_samples // LOG_FREQ, num_classes)
-    :param highest_cost_classses: list of integers of length topk. Ground truth of topk classes.
+    :param ground_truth: list of integers of length topk. Ground truth of topk classes.
     :param topk: int
     :return:
     """
-    assert len(highest_cost_classes) == topk
+    assert len(ground_truth) == topk
     avg_num_agreement = [None] * results.shape[1]
 
-    for idx in range(results.shape[0]):
-        topk_arms = (results[:, idx, :]).squeeze().argsort(axis=-1)[:, -topk:].flatten().tolist()
-        avg_num_agreement[idx] = len([_ for _ in topk_arms if _ in highest_cost_classes]) * 1.0 / (
+    for idx in range(results.shape[1]):
+        current_result = results[:, idx, :]
+        topk_arms = np.argsort(current_result, axis=-1)[:, -topk:]
+        topk_list = topk_arms.flatten().tolist()
+        avg_num_agreement[idx] = len([arm for arm in topk_list if arm in ground_truth]) * 1.0 / (
                 topk * results.shape[0])
     return {
         'avg_num_agreement': avg_num_agreement,
@@ -281,16 +285,17 @@ def main(args: argparse.Namespace) -> None:
         costs = np.load(args.cost_matrix)
     logging.info('Cost matrix:\n%s', costs)
 
-    # Determine the highest cost predicted class
+    # Determine the highest cost predicted classes
     expected_costs = (dataset.confusion_probs * costs).sum(axis=-1)
-    highest_cost_classes = expected_costs.argsort()[-args.topk:][::-1].flatten().tolist()
+    ground_truth = expected_costs.argsort()[-args.topk:][::-1].tolist()
+
     cost_string = '\n'.join('%i  %0.4f' % x for x in enumerate(expected_costs))
-    logging.info('TopK highest expected cost predicted class: %i', *highest_cost_classes)
+    logging.info('TopK highest expected cost predicted class: %i', *ground_truth)
     logging.info('Classwise expected costs:\n%s', cost_string)
 
-    pretty_print(dataset.confusion_prior)
-    print()
-    pretty_print(dataset.confusion_probs)
+    # pretty_print(dataset.confusion_prior)
+    # print()
+    # pretty_print(dataset.confusion_probs)
 
     # Run experiments...
     # stores MPE of classwise cost after every LOG_FREQ steps for each run...
@@ -301,60 +306,69 @@ def main(args: argparse.Namespace) -> None:
     if args.superclass:
         pseudocount = 3
     else:
-        pseudocount = dataset.num_classes
+        pseudocount = dataset.num_classes / 100
 
     # Sampling...
     for i in tqdm(range(N_SIMULATIONS)):
-        alphas = np.ones((dataset.num_classes, pseudocount))
+        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * pseudocount
         model = DirichletMultinomialCost(alphas, costs)
-        random_results[i] = select_and_label(dataset=dataset,
-                                             model=model,
-                                             topk=args.topk,
-                                             choice_fn=random_choice_fn)
+        random_results[i], random_confusion_log = select_and_label(dataset=dataset,
+                                                                   model=model,
+                                                                   topk=args.topk,
+                                                                   choice_fn=random_choice_fn)
         model.mpe()
 
-        alphas = np.ones((dataset.num_classes, pseudocount))
+        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * pseudocount
         model = DirichletMultinomialCost(alphas, costs)
-        active_results[i] = select_and_label(dataset=dataset,
-                                             model=model,
-                                             topk=args.topk,
-                                             choice_fn=max_choice_fn)
+        active_results[i], active_confusion_log = select_and_label(dataset=dataset,
+                                                                   model=model,
+                                                                   topk=args.topk,
+                                                                   choice_fn=max_choice_fn)
 
         model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
-        active_informed_results[i] = select_and_label(dataset=dataset,
-                                                      model=model,
-                                                      topk=args.topk,
-                                                      choice_fn=max_choice_fn)
+        active_informed_results[i], active_informed_confusion_log = select_and_label(dataset=dataset,
+                                                                                     model=model,
+                                                                                     topk=args.topk,
+                                                                                     choice_fn=max_choice_fn)
 
     # Evaluation...
-    random_success = eval(random_results, highest_cost_classes, args.topk)['avg_num_agreement']
-    active_success = eval(active_results, highest_cost_classes, args.topk)['avg_num_agreement']
-    active_informed_success = eval(active_informed_results, highest_cost_classes, args.topk)['avg_num_agreement']
+    random_success = eval(random_results, ground_truth, args.topk)['avg_num_agreement']
+    active_success = eval(active_results, ground_truth, args.topk)['avg_num_agreement']
+    active_informed_success = eval(active_informed_results, ground_truth, args.topk)['avg_num_agreement']
+
+    # Dump results...
+    np.save(args.output / f'random_success_top{args.topk}.npy', random_success)
+    np.save(args.output / f'active_success_top{args.topk}.npy', active_success)
+    np.save(args.output / f'active_informed_success_top{args.topk}.npy', active_informed_success)
+
+    np.save(args.output / f'random_confusion_log_top{args.topk}.npy', random_confusion_log)
+    np.save(args.output / f'active_confusion_log_top{args.topk}.npy', active_confusion_log)
+    np.save(args.output / f'active_informed_confusion_log_top{args.topk}.npy', active_informed_confusion_log)
 
     # Plot..
     fig, axes = plt.subplots(1, 1)
     x_axis = np.arange(len(random_success)) * LOG_FREQ
-    axes.plot(x_axis, random_success, label='random')
+    axes.plot(x_axis, random_success, label='non-active')
     axes.plot(x_axis, active_success, label='active (uniform prior)')
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
     plt.savefig(args.output / ('success_curve_topk_%d.png' % args.topk))
 
-    fig, axes = plt.subplots(1, 1)
-    n_samples = 1000
-    posterior_samples = model.sample(n_samples)
-    max_expected_costs = posterior_samples.argmax(axis=1)
-    hist = np.zeros((dataset.num_classes,))
-    for i in range(dataset.num_classes):
-        hist[i] = (max_expected_costs == i).sum() / n_samples
-    axes.bar(np.arange(dataset.num_classes), hist)
-    fig.savefig(args.output / ('posterior_costs_topk_%d.png' % args.topk))
+    # fig, axes = plt.subplots(1, 1)
+    # n_samples = 1000
+    # posterior_samples = model.sample(n_samples)
+    # max_expected_costs = posterior_samples.argmax(axis=1)
+    # hist = np.zeros((dataset.num_classes,))
+    # for i in range(dataset.num_classes):
+    #     hist[i] = (max_expected_costs == i).sum() / n_samples
+    # axes.bar(np.arange(dataset.num_classes), hist)
+    # fig.savefig(args.output / ('posterior_costs_topk_%d.png' % args.topk))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('output', type=pathlib.Path, default='../output/costs/cifar100_', help='output prefix')
+    parser.add_argument('-output', type=pathlib.Path, default='../output/costs/cifar100', help='output prefix')
     parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
     parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
                         help='path to a serialized numpy array containng the cost matrix')
