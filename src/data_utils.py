@@ -54,7 +54,10 @@ output_str_dict = {
     'bayesian_mce': 'mce_%s_PseudoCount%.1f_runs%d_bayesian.csv',
     'frequentist_mce': 'mce_%s_PseudoCount%.1f_runs%d_frequentist.csv'
 }
-
+cost_matrix_dir_dict = {
+    'human': '../output/cost_result_matrices/cifar100_people_full/costs.npy',
+    'superclass': '../output/cost_result_matrices/cifar100_superclass_full/costs.npy'
+}
 DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
 
 

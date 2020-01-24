@@ -7,7 +7,7 @@ from typing import Callable, Deque, Dict, Iterable, List, Tuple
 import matplotlib.pyplot as plt
 import numpy as np
 from cifar100meta import superclass_lookup
-from data_utils import datafile_dict
+from data_utils import datafile_dict, cost_matrix_dir_dict
 from models import DirichletMultinomialCost, Model
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
@@ -270,7 +270,9 @@ def main(args: argparse.Namespace) -> None:
     else:
         dataset = Dataset.load_from_text(datafile_dict[args.dataset])
 
-    if args.cost_matrix is None:
+    cost_matrix = cost_matrix_dir_dict[args.type_cost]
+
+    if cost_matrix is None:
         if args.superclass:
             costs = np.zeros((dataset.num_classes, 3))
             costs[:, 1] = 1
@@ -282,7 +284,7 @@ def main(args: argparse.Namespace) -> None:
             costs[:, -1] = args.k * costs[:, -1]
             np.fill_diagonal(costs, 0)
     else:
-        costs = np.load(args.cost_matrix)
+        costs = np.load(cost_matrix)
     logging.info('Cost matrix:\n%s', costs)
 
     # Determine the highest cost predicted classes
@@ -304,13 +306,12 @@ def main(args: argparse.Namespace) -> None:
     active_informed_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
 
     if args.superclass:
-        pseudocount = 3
-    else:
-        pseudocount = dataset.num_classes / 100
+        # will note enter this branch for now...
+        args.pseudocount = 3
 
     # Sampling...
     for i in tqdm(range(N_SIMULATIONS)):
-        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * pseudocount
+        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount
         model = DirichletMultinomialCost(alphas, costs)
         random_results[i], random_confusion_log = select_and_label(dataset=dataset,
                                                                    model=model,
@@ -318,14 +319,14 @@ def main(args: argparse.Namespace) -> None:
                                                                    choice_fn=random_choice_fn)
         model.mpe()
 
-        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * pseudocount
+        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount
         model = DirichletMultinomialCost(alphas, costs)
         active_results[i], active_confusion_log = select_and_label(dataset=dataset,
                                                                    model=model,
                                                                    topk=args.topk,
                                                                    choice_fn=max_choice_fn)
 
-        model = DirichletMultinomialCost(pseudocount * dataset.confusion_prior, costs)
+        model = DirichletMultinomialCost(args.pseudocount * dataset.confusion_prior, costs)
         active_informed_results[i], active_informed_confusion_log = select_and_label(dataset=dataset,
                                                                                      model=model,
                                                                                      topk=args.topk,
@@ -337,13 +338,13 @@ def main(args: argparse.Namespace) -> None:
     active_informed_success = eval(active_informed_results, ground_truth, args.topk)['avg_num_agreement']
 
     # Dump results...
-    np.save(args.output / f'random_success_top{args.topk}.npy', random_success)
-    np.save(args.output / f'active_success_top{args.topk}.npy', active_success)
-    np.save(args.output / f'active_informed_success_top{args.topk}.npy', active_informed_success)
+    np.save(args.output / f'random_success_top{args.topk}_pseudocount{args.pseudocount}.npy', random_success)
+    np.save(args.output / f'active_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_success)
+    np.save(args.output / f'active_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_informed_success)
 
-    np.save(args.output / f'random_confusion_log_top{args.topk}.npy', random_confusion_log)
-    np.save(args.output / f'active_confusion_log_top{args.topk}.npy', active_confusion_log)
-    np.save(args.output / f'active_informed_confusion_log_top{args.topk}.npy', active_informed_confusion_log)
+    np.save(args.output / f'random_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', random_confusion_log)
+    np.save(args.output / f'active_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', active_confusion_log)
+    np.save(args.output / f'active_informed_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy', active_informed_confusion_log)
 
     # Plot..
     fig, axes = plt.subplots(1, 1)
@@ -352,7 +353,7 @@ def main(args: argparse.Namespace) -> None:
     axes.plot(x_axis, active_success, label='active (uniform prior)')
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
-    plt.savefig(args.output / ('success_curve_topk_%d.png' % args.topk))
+    plt.savefig(args.output / f'success_curve_top{args.topk}_pseudocount{args.pseudocount}.png')
 
     # fig, axes = plt.subplots(1, 1)
     # n_samples = 1000
@@ -367,15 +368,17 @@ def main(args: argparse.Namespace) -> None:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
+    parser.add_argument('-dataset', type=str, default='cifar100', help='input dataset')
     parser.add_argument('-output', type=pathlib.Path, default='../output/costs/cifar100', help='output prefix')
     parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
-    parser.add_argument('-c', '--cost_matrix', type=pathlib.Path, default=None,
-                        help='path to a serialized numpy array containng the cost matrix')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
+    parser.add_argument('-type_cost', type=str, default=None, help='human or superclass')
+    parser.add_argument('-pseudocount', type=int, default=1, help='pseudocount per row for confusion matrix.')
     parser.add_argument('-k', type=float, default=2, help='relative cost')
     parser.add_argument('--superclass', action='store_true')
+
     args, _ = parser.parse_known_args()
+    args.output = args.output / args.type_cost
 
     logging.basicConfig(level=logging.INFO)
 
