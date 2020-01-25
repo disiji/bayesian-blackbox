@@ -27,7 +27,7 @@ OUTPUT_DIR = "../output/active_learning_topk"
 RUNS = 100
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
-PRIOR_STRENGTH = 5
+PRIOR_STRENGTH = 3
 CALIBRATION_MODEL = 'histogram_binning'
 HOLDOUT_RATIO = 0.1
 
@@ -54,7 +54,7 @@ def get_samples_topk(args: argparse.Namespace,
     if args.metric == 'accuracy':
         model = BetaBernoulli(num_classes, prior)
     elif args.metric == 'calibration_error':
-        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
+        model = ClasswiseEce(num_classes, num_bins=10, pseudocount=args.pseudocount, weight=weight, prior=None)
 
     deques = [deque() for _ in range(num_classes)]
     for category, score, observation, label, index in zip(categories, confidences, observations, labels, indices):
@@ -159,7 +159,7 @@ def eval(args: argparse.Namespace,
     if args.metric == 'accuracy':
         model = BetaBernoulli(num_classes, prior)
     elif args.metric == 'calibration_error':
-        model = ClasswiseEce(num_classes, num_bins=10, weight=weight, prior=None)
+        model = ClasswiseEce(num_classes, num_bins=10, pseudocount=args.pseudocount, weight=weight, prior=None)
 
     avg_num_agreement = np.zeros((num_samples // LOG_FREQ + 1,))
     cumulative_metric = np.zeros((num_samples // LOG_FREQ + 1,))
@@ -226,12 +226,12 @@ def eval(args: argparse.Namespace,
 
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
-    with process_lock:
-        logger.debug(holdout_calibrated_ece)
 
     if args.metric == 'accuracy':
         return avg_num_agreement, cumulative_metric, non_cumulative_metric
     elif args.metric == 'calibration_error':
+        with process_lock:
+            logger.debug(holdout_calibrated_ece)
         return avg_num_agreement, cumulative_metric, non_cumulative_metric, holdout_calibrated_ece
 
 
@@ -239,10 +239,20 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
     # If labels are getting cut off make the figsize smaller
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
 
-    total_samples = datasize_dict[args.dataset] * (1 - HOLDOUT_RATIO)
+    if args.metric == 'calibration_error':
+        total_samples = datasize_dict[args.dataset] * (1 - HOLDOUT_RATIO)
+    elif args.metric == 'accuracy':
+        total_samples = datasize_dict[args.dataset]
 
-    for method_name, metric_eval in eval_result_dict.items():
-        # metric_eval = metric_eval[: int(len(metric_eval) / 2)]
+    if args.metric == 'accuracy':
+        method_list = ['non-active', 'ts_uniform', 'ts_informed']
+        # method_list = ['non-active', 'ts_uniform']
+    elif args.metric == 'calibration_error':
+        method_list = ['non-active', 'ts']
+
+    for method_name in method_list:
+        metric_eval = eval_result_dict[method_name]
+        metric_eval = metric_eval[: int(len(metric_eval) / 2)]
         x = np.arange(len(metric_eval)) * eval_freq / total_samples
         plt.plot(x, metric_eval, label=method_name)
     plt.xlabel('#Percentage')
@@ -251,7 +261,7 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
     plt.yticks(fontsize=FONT_SIZE)
     plt.xticks(fontsize=FONT_SIZE)
     # plt.ylim(0.0, 1.0)
-    plt.xlim(0.0, 0.5)
+    # plt.xlim(0.0, 0.5)
     plt.savefig(figname, format='pdf', dpi=300, bbox_inches='tight')
 
 
@@ -310,11 +320,12 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
     num_samples = len(observations)
 
-    UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * PRIOR_STRENGTH
+    UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * args.pseudocount
     confidence = _get_confidence_k(categories, confidences, num_classes)
-    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * PRIOR_STRENGTH
+    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * args.pseudocount
 
-    experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
+    experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f' % (
+        args.dataset, args.metric, args.mode, args.topk, RUNS, args.pseudocount)
 
     if not (args.output / experiment_name).is_dir():
         (args.output / experiment_name).mkdir()
@@ -374,7 +385,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                      num_classes,
                                                                      num_samples,
                                                                      sample_method='random',
-                                                                     prior=UNIFORM_PRIOR,
+                                                                     prior=UNIFORM_PRIOR * 1e-6,
                                                                      random_seed=r)
 
             sampled_categories_dict['ts_uniform'][r], sampled_observations_dict['ts_uniform'][r], \
@@ -427,6 +438,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     if EVAL:
         ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
                                         topk=args.topk)
+
         for r in tqdm(range(RUNS)):
             avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
             non_cumulative_metric_dict['non-active'][r] = eval(args,
@@ -437,7 +449,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                sampled_indices_dict['non-active'][r].tolist(),
                                                                ground_truth,
                                                                num_classes=num_classes,
-                                                               prior=UNIFORM_PRIOR)
+                                                               prior=UNIFORM_PRIOR * 1e-6)
 
             avg_num_agreement_dict['ts_uniform'][r], cumulative_metric_dict['ts_uniform'][r], \
             non_cumulative_metric_dict['ts_uniform'][r] = eval(args,
@@ -533,7 +545,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
 
     num_samples = len(observations)
 
-    experiment_name = '%s_%s_%s_top%d_runs%d' % (args.dataset, args.metric, args.mode, args.topk, RUNS)
+    experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f' % (
+        args.dataset, args.metric, args.mode, args.topk, RUNS, args.pseudocount)
 
     if not (args.output / experiment_name).is_dir():
         (args.output / experiment_name).mkdir()
@@ -792,6 +805,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
     parser.add_argument('-topk', type=int, default=10, help='number of optimal arms to identify')
     parser.add_argument('-metric', type=str, help='accuracy or calibration_error')
+    parser.add_argument('-pseudocount', type=float, default=PRIOR_STRENGTH, help='strength of prior')
     parser.add_argument('-mode', type=str, help='min or max, identify topk with highest/lowest reward')
     parser.add_argument('--calibration_model', type=str, default=CALIBRATION_MODEL,
                         help='calibration models to apply on holdout data')

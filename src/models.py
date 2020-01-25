@@ -125,7 +125,7 @@ class SumOfBetaEce(Model):
     prior_beta: np.ndarray (num_bins, ), beta parameter of the Beta distribution for each bin
     """
 
-    def __init__(self, num_bins: int, weight: np.ndarray = None, peusdo_count: int = 3, prior_alpha: np.ndarray = None,
+    def __init__(self, num_bins: int, weight: np.ndarray = None, pseudocount: int = 3, prior_alpha: np.ndarray = None,
                  prior_beta: np.ndarray = None):
         """
 
@@ -145,7 +145,7 @@ class SumOfBetaEce(Model):
 
         # initialize the mode of each Beta distribution on diagonal
         if prior_alpha is None:
-            self._alpha = np.array([(i + 0.5) * (peusdo_count - 2) / num_bins + 1 for i in range(self._num_bins)])
+            self._alpha = np.array([(i + 0.5) * (pseudocount - 2) / num_bins + 1 for i in range(self._num_bins)])
         else:
             self._alpha = np.copy(prior_alpha)
 
@@ -254,12 +254,13 @@ class ClasswiseEce(Model):
 
     """
 
-    def __init__(self, k: int, num_bins: int, weight: None, prior=None):
+    def __init__(self, k: int, num_bins: int, pseudocount: float, weight: None, prior=None):
         """
         Parameters
         ==========
         k: number of classes
         num_bins: number of bins for evaluating ECE
+        pseudocount:
         weight: a list of (num_bins, ) arrays of length k
         prior: an (number of classes, k, 2) array for alpha and beta parameters in the prior Beta distributions.
 
@@ -274,7 +275,9 @@ class ClasswiseEce(Model):
 
         if prior is None:
             self._classwise_ece_models = [
-                copy.deepcopy(SumOfBetaEce(num_bins, weight=weight[class_idx], prior_alpha=None, prior_beta=None))
+                copy.deepcopy(
+                    SumOfBetaEce(num_bins, weight=weight[class_idx], pseudocount=pseudocount, prior_alpha=None,
+                                 prior_beta=None))
                 for class_idx in range(k)]
         else:
             self._classwise_ece_models = [
