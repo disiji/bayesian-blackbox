@@ -11,12 +11,13 @@ from typing import List, Dict, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
+
 from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
 from data_utils import datafile_dict, num_classes_dict, logits_dict, datasize_dict, prepare_data, train_holdout_split, \
     DATASET_LIST
 from models import BetaBernoulli, ClasswiseEce
-from tqdm import tqdm
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -28,7 +29,7 @@ RUNS = 100
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 3
-CALIBRATION_MODEL = 'histogram_binning'
+CALIBRATION_MODEL = 'platt_scaling'
 HOLDOUT_RATIO = 0.1
 
 logger = logging.getLogger(__name__)
@@ -245,8 +246,7 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
         total_samples = datasize_dict[args.dataset]
 
     if args.metric == 'accuracy':
-        method_list = ['non-active', 'ts_uniform', 'ts_informed']
-        # method_list = ['non-active', 'ts_uniform']
+        method_list = ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']
     elif args.metric == 'calibration_error':
         method_list = ['non-active', 'ts']
 
@@ -257,7 +257,7 @@ def _comparison_plot(eval_result_dict: Dict[str, np.ndarray], eval_freq: int, fi
         plt.plot(x, metric_eval, label=method_name)
     plt.xlabel('#Percentage')
     plt.ylabel(ylabel)
-    plt.legend()
+    plt.legend(fontsize=FONT_SIZE - 2)
     plt.yticks(fontsize=FONT_SIZE)
     plt.xticks(fontsize=FONT_SIZE)
     # plt.ylim(0.0, 1.0)
@@ -286,7 +286,7 @@ def comparison_plot(args: argparse.Namespace,
 
     # avg over runs
     if args.metric == 'accuracy':
-        method_list = ['non-active', 'ts_uniform', 'ts_informed']
+        method_list = ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']
     elif args.metric == 'calibration_error':
         method_list = ['non-active', 'ts']
 
@@ -357,16 +357,24 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     }
 
     avg_num_agreement_dict = {
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     cumulative_metric_dict = {
+        'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     non_cumulative_metric_dict = {
+        'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
@@ -440,16 +448,42 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                         topk=args.topk)
 
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['non-active'][r], cumulative_metric_dict['non-active'][r], \
-            non_cumulative_metric_dict['non-active'][r] = eval(args,
-                                                               sampled_categories_dict['non-active'][r].tolist(),
-                                                               sampled_observations_dict['non-active'][r].tolist(),
-                                                               sampled_scores_dict['non-active'][r].tolist(),
-                                                               sampled_labels_dict['non-active'][r].tolist(),
-                                                               sampled_indices_dict['non-active'][r].tolist(),
-                                                               ground_truth,
-                                                               num_classes=num_classes,
-                                                               prior=UNIFORM_PRIOR * 1e-6)
+            avg_num_agreement_dict['non-active_no_prior'][r], cumulative_metric_dict['non-active_no_prior'][r], \
+            non_cumulative_metric_dict['non-active_no_prior'][r] = eval(args,
+                                                                        sampled_categories_dict['non-active'][
+                                                                            r].tolist(),
+                                                                        sampled_observations_dict['non-active'][
+                                                                            r].tolist(),
+                                                                        sampled_scores_dict['non-active'][r].tolist(),
+                                                                        sampled_labels_dict['non-active'][r].tolist(),
+                                                                        sampled_indices_dict['non-active'][r].tolist(),
+                                                                        ground_truth,
+                                                                        num_classes=num_classes,
+                                                                        prior=UNIFORM_PRIOR * 1e-6)
+            avg_num_agreement_dict['non-active_uniform'][r], cumulative_metric_dict['non-active_uniform'][r], \
+            non_cumulative_metric_dict['non-active_uniform'][r] = eval(args,
+                                                                       sampled_categories_dict['non-active'][
+                                                                           r].tolist(),
+                                                                       sampled_observations_dict['non-active'][
+                                                                           r].tolist(),
+                                                                       sampled_scores_dict['non-active'][r].tolist(),
+                                                                       sampled_labels_dict['non-active'][r].tolist(),
+                                                                       sampled_indices_dict['non-active'][r].tolist(),
+                                                                       ground_truth,
+                                                                       num_classes=num_classes,
+                                                                       prior=UNIFORM_PRIOR)
+            avg_num_agreement_dict['non-active_informed'][r], cumulative_metric_dict['non-active_informed'][r], \
+            non_cumulative_metric_dict['non-active_informed'][r] = eval(args,
+                                                                        sampled_categories_dict['non-active'][
+                                                                            r].tolist(),
+                                                                        sampled_observations_dict['non-active'][
+                                                                            r].tolist(),
+                                                                        sampled_scores_dict['non-active'][r].tolist(),
+                                                                        sampled_labels_dict['non-active'][r].tolist(),
+                                                                        sampled_indices_dict['non-active'][r].tolist(),
+                                                                        ground_truth,
+                                                                        num_classes=num_classes,
+                                                                        prior=INFORMED_PRIOR)
 
             avg_num_agreement_dict['ts_uniform'][r], cumulative_metric_dict['ts_uniform'][r], \
             non_cumulative_metric_dict['ts_uniform'][r] = eval(args,
@@ -473,7 +507,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                 num_classes=num_classes,
                                                                 prior=INFORMED_PRIOR)
 
-        for method in ['non-active', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('cumulative_metric_%s.npy' % method),
@@ -481,7 +515,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             np.save(args.output / experiment_name / ('non_cumulative_metric_%s.npy' % method),
                     non_cumulative_metric_dict[method])
     else:
-        for method in ['non-active', 'ts_uniform', 'ts_informed']:
+        for method in ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             cumulative_metric_dict[method] = np.load(

@@ -6,11 +6,12 @@ from typing import Callable, Deque, Dict, Iterable, List, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.metrics import confusion_matrix
+from tqdm import tqdm
+
 from cifar100meta import superclass_lookup
 from data_utils import datafile_dict, cost_matrix_dir_dict
 from models import DirichletMultinomialCost, Model
-from sklearn.metrics import confusion_matrix
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -301,8 +302,10 @@ def main(args: argparse.Namespace) -> None:
 
     # Run experiments...
     # stores MPE of classwise cost after every LOG_FREQ steps for each run...
-    random_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
-    active_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
+    random_no_prior_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
+    random_uniform_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
+    random_informed_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
+    active_uniform_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
     active_informed_results = np.zeros((N_SIMULATIONS, len(dataset) // LOG_FREQ, dataset.num_classes))
 
     if args.superclass:
@@ -310,41 +313,62 @@ def main(args: argparse.Namespace) -> None:
         args.pseudocount = 3
 
     # Sampling...
+    no_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-6
+    uniform_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount / dataset.num_classes
+    informed_prior_alphas = args.pseudocount * dataset.confusion_prior
     for i in tqdm(range(N_SIMULATIONS)):
-        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-6
-        model = DirichletMultinomialCost(alphas, costs)
-        random_results[i], random_confusion_log = select_and_label(dataset=dataset,
-                                                                   model=model,
-                                                                   topk=args.topk,
-                                                                   choice_fn=random_choice_fn)
-        model.mpe()
+        model = DirichletMultinomialCost(no_prior_alphas, costs)
+        random_no_prior_results[i], random_no_prior_confusion_log = select_and_label(dataset=dataset,
+                                                                                     model=model,
+                                                                                     topk=args.topk,
+                                                                                     choice_fn=random_choice_fn)
 
-        alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount
-        model = DirichletMultinomialCost(alphas, costs)
-        active_results[i], active_confusion_log = select_and_label(dataset=dataset,
-                                                                   model=model,
-                                                                   topk=args.topk,
-                                                                   choice_fn=max_choice_fn)
+        model = DirichletMultinomialCost(uniform_prior_alphas, costs)
+        random_uniform_results[i], random_uniform_confusion_log = select_and_label(dataset=dataset,
+                                                                                   model=model,
+                                                                                   topk=args.topk,
+                                                                                   choice_fn=random_choice_fn)
+        model = DirichletMultinomialCost(informed_prior_alphas, costs)
+        random_informed_results[i], random_informed_confusion_log = select_and_label(dataset=dataset,
+                                                                                     model=model,
+                                                                                     topk=args.topk,
+                                                                                     choice_fn=random_choice_fn)
 
-        model = DirichletMultinomialCost(args.pseudocount * dataset.confusion_prior, costs)
+        model = DirichletMultinomialCost(uniform_prior_alphas, costs)
+        active_uniform_results[i], active_confusion_log = select_and_label(dataset=dataset,
+                                                                           model=model,
+                                                                           topk=args.topk,
+                                                                           choice_fn=max_choice_fn)
+        model = DirichletMultinomialCost(informed_prior_alphas, costs)
         active_informed_results[i], active_informed_confusion_log = select_and_label(dataset=dataset,
                                                                                      model=model,
                                                                                      topk=args.topk,
                                                                                      choice_fn=max_choice_fn)
 
     # Evaluation...
-    random_success = eval(random_results, ground_truth, args.topk)['avg_num_agreement']
-    active_success = eval(active_results, ground_truth, args.topk)['avg_num_agreement']
+    random_no_prior_success = eval(random_no_prior_results, ground_truth, args.topk)['avg_num_agreement']
+    random_uniform_success = eval(random_uniform_results, ground_truth, args.topk)['avg_num_agreement']
+    random_informed_success = eval(random_informed_results, ground_truth, args.topk)['avg_num_agreement']
+    active_success = eval(active_uniform_results, ground_truth, args.topk)['avg_num_agreement']
     active_informed_success = eval(active_informed_results, ground_truth, args.topk)['avg_num_agreement']
 
     # Dump results...
-    np.save(args.output / f'random_success_top{args.topk}_pseudocount{args.pseudocount}.npy', random_success)
+    np.save(args.output / f'random_no_prior_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_no_prior_success)
+    np.save(args.output / f'random_uniform_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_uniform_success)
+    np.save(args.output / f'random_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_informed_success)
     np.save(args.output / f'active_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_success)
     np.save(args.output / f'active_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
             active_informed_success)
 
-    np.save(args.output / f'random_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
-            random_confusion_log)
+    np.save(args.output / f'random_no_prior_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_no_prior_confusion_log)
+    np.save(args.output / f'random_uniform_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_uniform_confusion_log)
+    np.save(args.output / f'random_informed_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_informed_confusion_log)
     np.save(args.output / f'active_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
             active_confusion_log)
     np.save(args.output / f'active_informed_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
@@ -352,8 +376,10 @@ def main(args: argparse.Namespace) -> None:
 
     # Plot..
     fig, axes = plt.subplots(1, 1)
-    x_axis = np.arange(len(random_success)) * LOG_FREQ
-    axes.plot(x_axis, random_success, label='non-active')
+    x_axis = np.arange(len(random_no_prior_success)) * LOG_FREQ
+    axes.plot(x_axis, random_no_prior_success, label='non-active(no prior)')
+    axes.plot(x_axis, random_uniform_success, label='non-active(uniform prior)')
+    axes.plot(x_axis, random_informed_success, label='non-active(informative prior)')
     axes.plot(x_axis, active_success, label='active (uniform prior)')
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
