@@ -115,7 +115,8 @@ class BetaBernoulli(Model):
 
 
 class SumOfBetaEce(Model):
-    """Model ECE as weighted sum of absolute shifted Beta distributions, with each Beta distribution capturing the accuracy per bin.
+    """Model ECE as weighted sum of absolute shifted Beta distributions, with each Beta distribution capturing the
+    accuracy per bin.
 
     Parameters
     ==========
@@ -128,6 +129,8 @@ class SumOfBetaEce(Model):
     def __init__(self, num_bins: int, weight: np.ndarray = None, pseudocount: int = 3, prior_alpha: np.ndarray = None,
                  prior_beta: np.ndarray = None):
         """
+        Init model parameters self._alpha and self._beta, either with pseudocount (put mean of beta on diagonal
+        with prior strength pseudocount) or with given prior_alpha and prior_beta.
 
         :param num_bins:
         :param weight:
@@ -145,14 +148,16 @@ class SumOfBetaEce(Model):
 
         # initialize the mode of each Beta distribution on diagonal
         if prior_alpha is None:
-            self._alpha = np.array([(i + 0.5) * (pseudocount - 2) / num_bins + 1 for i in range(self._num_bins)])
+            # self._alpha = np.array([(i + 0.5) * (pseudocount - 2) / num_bins + 1 for i in range(self._num_bins)])
+            self._alpha = (np.arange(num_bins) + 0.5) * pseudocount / num_bins
         else:
             self._alpha = np.copy(prior_alpha)
 
         if prior_beta is None:
-            self._beta = np.array(
-                [(self._alpha[i] - 1) * self._num_bins / (i + 0.5) - (self._alpha[i] - 2) for i in
-                 range(self._num_bins)])
+            # self._beta = np.array(
+            #     [(self._alpha[i] - 1) * self._num_bins / (i + 0.5) - (self._alpha[i] - 2) for i in
+            #      range(self._num_bins)])
+            self._beta = pseudocount - self._alpha
         else:
             self._beta = np.copy(prior_beta)
 
