@@ -862,4 +862,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=False, PLOT=False)
+        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)

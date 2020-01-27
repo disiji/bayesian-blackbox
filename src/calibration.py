@@ -1,5 +1,3 @@
-import warnings
-
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.cluster.vq
@@ -13,16 +11,6 @@ import sklearn.multiclass
 import sklearn.utils
 from sklearn.base import clone
 from sklearn.utils.validation import check_is_fitted
-
-# Ignore FutureWarnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
-
-# Turn off tensorflow deprecation warnings
-try:
-    from tensorflow.python.util import module_wrapper as deprecation
-except ImportError:
-    from tensorflow.python.util import deprecation_wrapper as deprecation
-deprecation._PER_MODULE_WARNING_LIMIT = 0
 
 
 class CalibrationMethod(sklearn.base.BaseEstimator):
@@ -166,6 +154,7 @@ class TemperatureScaling(CalibrationMethod):
         self : object
             Returns an instance of self.
         """
+
         # Define objective function (NLL / cross entropy)
         def objective(T):
             # Calibrate with given T
@@ -429,7 +418,6 @@ class HistogramBinning(CalibrationMethod):
         .. [1] Zadrozny, B. & Elkan, C. Obtaining calibrated probability estimates from decision trees and naive Bayesian
                classifiers in Proceedings of the 18th International Conference on Machine Learning (ICML, 2001), 609–616.
     """
-
 
     def __init__(self, mode='equal_width', n_bins=20, input_range=[0, 1]):
         super().__init__()
