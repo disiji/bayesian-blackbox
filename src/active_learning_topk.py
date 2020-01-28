@@ -25,9 +25,9 @@ GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
-RUNS = 10
+RUNS = 100
 LOG_FREQ = 100
-CALIBRATION_FREQ = 1000
+CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 3
 CALIBRATION_MODEL = 'platt_scaling'
 HOLDOUT_RATIO = 0.1
@@ -335,7 +335,6 @@ def comparison_plot(args: argparse.Namespace,
         if holdout_ece_dict:
             holdout_ece_dict[method] = holdout_ece_dict[method].mean(axis=0)
         if mrr_dict:
-            print(mrr_dict[method])
             mrr_dict[method] = mrr_dict[method].mean(axis=0)
 
     _comparison_plot(avg_num_agreement_dict, LOG_FREQ,
