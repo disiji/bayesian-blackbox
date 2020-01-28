@@ -138,7 +138,7 @@ def mean_reciprocal_rank(metric_val: np.ndarray,
     offset[argsort] = np.arange(k)
     adjusted_rank = raw_rank - offset
 
-    return 1 / adjusted_rank.mean()
+    return (1 / adjusted_rank).mean()
 
 
 def eval(args: argparse.Namespace,
