@@ -323,7 +323,7 @@ def main(args: argparse.Namespace) -> None:
         args.pseudocount = 3
 
     # Sampling...
-    no_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-6
+    no_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-3
     uniform_prior_alphas = np.ones(
         (dataset.num_classes, dataset.num_classes)) * args.pseudocount / dataset.num_classes
     informed_prior_alphas = args.pseudocount * dataset.confusion_prior
@@ -386,7 +386,7 @@ def main(args: argparse.Namespace) -> None:
             random_uniform_mrr)
     np.save(args.output / f'random_informed_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
             random_informed_mrr)
-    np.save(args.output / f'active_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy', active_success)
+    np.save(args.output / f'active_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy', active_mrr)
     np.save(args.output / f'active_informed_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
             active_informed_mrr)
 
