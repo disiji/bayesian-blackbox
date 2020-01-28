@@ -1,3 +1,5 @@
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.cluster.vq
@@ -10,8 +12,14 @@ import sklearn.linear_model
 import sklearn.multiclass
 import sklearn.utils
 from sklearn.base import clone
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.utils._joblib import Parallel
+from sklearn.utils._joblib import delayed
 from sklearn.utils.validation import check_is_fitted
 
+
+# Ignore binned_statistic FutureWarning
+# warnings.simplefilter(action='ignore', category=FutureWarning)
 
 class CalibrationMethod(sklearn.base.BaseEstimator):
     """
@@ -689,6 +697,158 @@ class BayesianBinningQuantiles(CalibrationMethod):
         elif np.shape(X)[1] > 2:
             check_is_fitted(self, "onevsrest_calibrator_")
             return self.onevsrest_calibrator_.predict_proba(X)
+
+
+class OneVsRestCalibrator(sklearn.base.BaseEstimator):
+    """One-vs-the-rest (OvR) multiclass strategy
+    Also known as one-vs-all, this strategy consists in fitting one calibrator
+    per class. The probabilities to be calibrated of the other classes are summed.
+    For each calibrator, the class is fitted against all the other classes.
+    Parameters
+    ----------
+    calibrator : CalibrationMethod object
+        A CalibrationMethod object implementing `fit` and `predict_proba`.
+    n_jobs : int or None, optional (default=None)
+        The number of jobs to use for the computation.
+        ``None`` means 1 unless in a :obj:`joblib.parallel_backend` context.
+        ``-1`` means using all processors. See :term:`Glossary <n_jobs>`
+        for more details.
+    Attributes
+    ----------
+    calibrators_ : list of `n_classes` estimators
+        Estimators used for predictions.
+    classes_ : array, shape = [`n_classes`]
+        Class labels.
+    label_binarizer_ : LabelBinarizer object
+        Object used to transform multiclass labels to binary labels and
+        vice-versa.
+    """
+
+    def __init__(self, calibrator, n_jobs=None):
+        self.calibrator = calibrator
+        self.n_jobs = n_jobs
+
+    def fit(self, X, y):
+        """Fit underlying estimators.
+        Parameters
+        ----------
+        X : (sparse) array-like, shape = [n_samples, n_features]
+            Calibration data.
+        y : (sparse) array-like, shape = [n_samples, ]
+            Multi-class labels.
+        Returns
+        -------
+        self
+        """
+        # A sparse LabelBinarizer, with sparse_output=True, has been shown to
+        # outperform or match a dense label binarizer in all cases and has also
+        # resulted in less or equal memory consumption in the fit_ovr function
+        # overall.
+        self.label_binarizer_ = LabelBinarizer(sparse_output=True)
+        Y = self.label_binarizer_.fit_transform(y)
+        Y = Y.tocsc()
+        self.classes_ = self.label_binarizer_.classes_
+        columns = (col.toarray().ravel() for col in Y.T)
+        # In cases where individual estimators are very fast to train setting
+        # n_jobs > 1 in can results in slower performance due to the overhead
+        # of spawning threads.  See joblib issue #112.
+        self.calibrators_ = Parallel(n_jobs=self.n_jobs)(
+            delayed(OneVsRestCalibrator._fit_binary)(self.calibrator, X, column, classes=[
+                "not %s" % self.label_binarizer_.classes_[i], self.label_binarizer_.classes_[i]]) for i, column in
+            enumerate(columns))
+        return self
+
+    def predict_proba(self, X):
+        """
+        Probability estimates.
+        The returned estimates for all classes are ordered by label of classes.
+        Parameters
+        ----------
+        X : array-like, shape = [n_samples, n_features]
+        Returns
+        -------
+        T : (sparse) array-like, shape = [n_samples, n_classes]
+            Returns the probability of the sample for each class in the model,
+            where classes are ordered as they are in `self.classes_`.
+        """
+        check_is_fitted(self, ["classes_", "calibrators_"])
+
+        # Y[i, j] gives the probability that sample i has the label j.
+        Y = np.array([c.predict_proba(
+            np.column_stack([np.sum(np.delete(X, obj=i, axis=1), axis=1), X[:, self.classes_[i]]]))[:, 1] for i, c in
+                      enumerate(self.calibrators_)]).T
+
+        if len(self.calibrators_) == 1:
+            # Only one estimator, but we still want to return probabilities for two classes.
+            Y = np.concatenate(((1 - Y), Y), axis=1)
+
+        # Pad with zeros for classes not in training data
+        if np.shape(Y)[1] != np.shape(X)[1]:
+            p_pred = np.zeros(np.shape(X))
+            p_pred[:, self.classes_] = Y
+            Y = p_pred
+
+        # Normalize probabilities to 1.
+        Y = sklearn.preprocessing.normalize(Y, norm='l1', axis=1, copy=True, return_norm=False)
+        return np.clip(Y, a_min=0, a_max=1)
+
+    @property
+    def n_classes_(self):
+        return len(self.classes_)
+
+    @property
+    def _first_calibrator(self):
+        return self.calibrators_[0]
+
+    @staticmethod
+    def _fit_binary(calibrator, X, y, classes=None):
+        """
+        Fit a single binary calibrator.
+        Parameters
+        ----------
+        calibrator
+        X
+        y
+        classes
+        Returns
+        -------
+        """
+        # Sum probabilities of combined classes in calibration training data X
+        cl = classes[1]
+        X = np.column_stack([np.sum(np.delete(X, cl, axis=1), axis=1), X[:, cl]])
+
+        # Check whether only one label is present in training data
+        unique_y = np.unique(y)
+        if len(unique_y) == 1:
+            if classes is not None:
+                if y[0] == -1:
+                    c = 0
+                else:
+                    c = y[0]
+                warnings.warn("Label %s is present in all training examples." %
+                              str(classes[c]))
+            calibrator = _ConstantCalibrator().fit(X, unique_y)
+        else:
+            calibrator = clone(calibrator)
+            calibrator.fit(X, y)
+        return calibrator
+
+
+class _ConstantCalibrator(CalibrationMethod):
+
+    def fit(self, X, y):
+        self.y_ = y
+        return self
+
+    def predict(self, X):
+        check_is_fitted(self, 'y_')
+
+        return np.repeat(self.y_, X.shape[0])
+
+    def predict_proba(self, X):
+        check_is_fitted(self, 'y_')
+
+        return np.repeat([np.hstack([1 - self.y_, self.y_])], X.shape[0], axis=0)
 
 
 CALIBRATION_MODELS = {

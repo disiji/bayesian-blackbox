@@ -27,7 +27,7 @@ FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
 RUNS = 10
 LOG_FREQ = 100
-CALIBRATION_FREQ = 100
+CALIBRATION_FREQ = 1000
 PRIOR_STRENGTH = 3
 CALIBRATION_MODEL = 'platt_scaling'
 HOLDOUT_RATIO = 0.1
@@ -237,14 +237,16 @@ def eval(args: argparse.Namespace,
             if idx == 0:
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
             else:
-                calibration_model = CALIBRATION_MODELS[args.calibration_model]()
                 if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+                    calibration_model = CALIBRATION_MODELS[args.calibration_model]()
                     X = np.array(confidences[:idx])
                     X = np.array([1 - X, X]).T
                     y = np.array(observations[:idx]) * 1
                     calibration_model.fit(X, y)
                     calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)[:, 1].tolist()
+
                 elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
+                    calibration_model = CALIBRATION_MODELS[args.calibration_model]()
                     X = logits[indices[:idx]]
                     y = np.array(labels[:idx], dtype=np.int)
                     calibration_model.fit(X, y)
@@ -253,6 +255,12 @@ def eval(args: argparse.Namespace,
                     calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)
                     calibrated_holdout_confidences = np.take_along_axis(calibrated_holdout_confidences, pred_array,
                                                                         axis=1).squeeze().tolist()
+                elif args.calibration_model in ['classwise_histogram_binning']:
+                    # use the current MPE reliability diagram for calibration, no need to train a separate calibration model
+                    calibration_mapping = model.beta_params_mpe
+                    bin_idx = np.floor(np.array(holdout_confidences) * 10).astype(int)
+                    bin_idx[bin_idx == 10] = 9
+                    calibrated_holdout_confidences = calibration_mapping[holdout_categories, bin_idx]
 
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
@@ -924,4 +932,4 @@ if __name__ == "__main__":
     if args.metric == 'accuracy':
         main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, SAMPLE=False, EVAL=True, PLOT=True)
