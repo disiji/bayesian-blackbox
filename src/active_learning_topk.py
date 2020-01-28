@@ -116,6 +116,31 @@ def get_samples_topk(args: argparse.Namespace,
     return sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices
 
 
+def mean_reciprocal_rank(metric_val: np.ndarray,
+                         ground_truth: np.ndarray,
+                         mode: str) -> float:
+    """Computes mean reciprocal rank"""
+    num_classes = metric_val.shape[0]
+    k = np.sum(ground_truth)
+
+    # Compute rank of each class
+    argsort = metric_val.argsort()
+    rank = np.empty_like(argsort)
+    rank[argsort] = np.arange(num_classes) + 1
+    if mode == 'max':  # Need to flip so that largest class has rank 1
+        rank = num_classes - rank + 1
+
+    # In top-k setting, we need to adjust so that other ground truth classes
+    # are not considered in the ranking.
+    raw_rank = rank[ground_truth]
+    argsort = raw_rank.argsort()
+    offset = np.empty_like(argsort)
+    offset[argsort] = np.arange(k)
+    adjusted_rank = raw_rank - offset
+
+    return 1 / adjusted_rank.mean()
+
+
 def eval(args: argparse.Namespace,
          categories: List[int],
          observations: List[bool],
@@ -205,10 +230,7 @@ def eval(args: argparse.Namespace,
             non_cumulative_metric[idx // LOG_FREQ] = metric_val[topk_arms].mean()
 
             # MRR
-            rank = metric_val.argsort() + 1
-            if args.mode == 'max':  # Need to flip so that largest class has rank 1
-                rank = num_classes - rank
-            mrr[idx // LOG_FREQ] = 1 / rank[ground_truth == 1].mean()
+            mrr[idx // LOG_FREQ] = mean_reciprocal_rank(metric_val, ground_truth, args.mode)
 
         if args.metric == 'calibration_error' and idx % CALIBRATION_FREQ == 0:
             # before calibration
@@ -238,8 +260,8 @@ def eval(args: argparse.Namespace,
     if args.metric == 'accuracy':
         return avg_num_agreement, cumulative_metric, non_cumulative_metric, mrr
     elif args.metric == 'calibration_error':
-        with process_lock:
-            logger.debug(holdout_calibrated_ece)
+        # with process_lock:
+        #     logger.debug(holdout_calibrated_ece)
         return avg_num_agreement, cumulative_metric, non_cumulative_metric, holdout_calibrated_ece, mrr
 
 
@@ -304,6 +326,9 @@ def comparison_plot(args: argparse.Namespace,
         non_cumulative_metric_dict[method] = non_cumulative_metric_dict[method].mean(axis=0)
         if holdout_ece_dict:
             holdout_ece_dict[method] = holdout_ece_dict[method].mean(axis=0)
+        if mrr_dict:
+            print(mrr_dict[method])
+            mrr_dict[method] = mrr_dict[method].mean(axis=0)
 
     _comparison_plot(avg_num_agreement_dict, LOG_FREQ,
                      args.output / experiment_name / "avg_num_agreement.pdf",
@@ -320,7 +345,7 @@ def comparison_plot(args: argparse.Namespace,
 
     if mrr_dict:
         _comparison_plot(mrr_dict, LOG_FREQ,
-                         args.output / experiment_name / ("mrr_%s.pdf" % args.metric), 'Mean Reciprocal Rank %s' % args.metric)
+                         args.output / experiment_name / "mrr.pdf", 'Mean Reciprocal Rank %s' % args.metric)
 
 
 def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -481,7 +506,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                         num_classes=num_classes,
                                                                         prior=UNIFORM_PRIOR * 1e-6)
             avg_num_agreement_dict['non-active_uniform'][r], cumulative_metric_dict['non-active_uniform'][r], \
-            non_cumulative_metric_dict['non-active_uniform'][r], mrr_dict['non-active_uniform'] = eval(args,
+            non_cumulative_metric_dict['non-active_uniform'][r], mrr_dict['non-active_uniform'][r] = eval(args,
                                                                        sampled_categories_dict['non-active'][
                                                                            r].tolist(),
                                                                        sampled_observations_dict['non-active'][
@@ -493,7 +518,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                        num_classes=num_classes,
                                                                        prior=UNIFORM_PRIOR)
             avg_num_agreement_dict['non-active_informed'][r], cumulative_metric_dict['non-active_informed'][r], \
-            non_cumulative_metric_dict['non-active_informed'][r], mrr_dict['non-active_informed'] = eval(args,
+            non_cumulative_metric_dict['non-active_informed'][r], mrr_dict['non-active_informed'][r] = eval(args,
                                                                         sampled_categories_dict['non-active'][
                                                                             r].tolist(),
                                                                         sampled_observations_dict['non-active'][
@@ -517,7 +542,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                prior=UNIFORM_PRIOR)
 
             avg_num_agreement_dict['ts_informed'][r], cumulative_metric_dict['ts_informed'][r], \
-            non_cumulative_metric_dict['ts_informed'][r], mrr_dict['ts_informed'] = eval(args,
+            non_cumulative_metric_dict['ts_informed'][r], mrr_dict['ts_informed'][r] = eval(args,
                                                                 sampled_categories_dict['ts_informed'][r].tolist(),
                                                                 sampled_observations_dict['ts_informed'][r].tolist(),
                                                                 sampled_scores_dict['ts_informed'][r].tolist(),
