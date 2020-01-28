@@ -192,7 +192,7 @@ class SumOfBetaEce(Model):
     @property
     def frequentist_eval(self) -> None:
         """
-        Eval ECE in a frequentist's way
+        Eval ECE in a frequentist's way.
 
         :return:
         """
@@ -200,6 +200,15 @@ class SumOfBetaEce(Model):
         accuracy = self._counts[:, 0] / tmp
         weight = tmp / sum(tmp)
         return np.dot(np.abs(accuracy - self._confidence), weight)
+
+    @property
+    def beta_params_mpe(self) -> np.ndarray:
+        """
+        MPE of accuracy per bin.
+
+        :return: (self._num_bins, )
+        """
+        return self._alpha / (self._alpha + self._beta)
 
     def get_params(self):
         return self._alpha, self._beta
@@ -259,7 +268,7 @@ class ClasswiseEce(Model):
 
     """
 
-    def __init__(self, k: int, num_bins: int, pseudocount: float, weight: None, prior=None):
+    def __init__(self, k: int, num_bins: int, pseudocount: float, weight=None, prior=None):
         """
         Parameters
         ==========
@@ -274,6 +283,7 @@ class ClasswiseEce(Model):
         =======
         """
         self._k = k
+        self._num_bins = num_bins
 
         if weight is None:
             weight = [None] * self._k
@@ -349,6 +359,14 @@ class ClasswiseEce(Model):
         classwise_ece_variance = np.array(
             [self._classwise_ece_models[class_idx].variance for class_idx in range(self._k)])
         return classwise_ece_variance
+
+    @property
+    def beta_params_mpe(self) -> np.ndarray:
+        """
+        Computes MPE of accuracy per predicted class per bin.
+        :return: (self._k, self._num_bins)
+        """
+        return np.array([self._classwise_ece_models[class_idx].beta_params_mpe for class_idx in range(self._k)])
 
     def sample(self, num_samples: int = 1) -> np.ndarray:
         """Draw sample eces from the posterior.
