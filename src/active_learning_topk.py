@@ -411,7 +411,6 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
@@ -419,7 +418,6 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
@@ -427,7 +425,6 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
         'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
