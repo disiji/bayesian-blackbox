@@ -79,7 +79,7 @@ def bayesian_assessment(args: argparse.Namespace,
     if args.prior_type == 'fixed_var':
         beta_priors = np.array([BetaParams((i + 0.5) / args.num_bins, var) for i in range(args.num_bins)])
     elif args.prior_type == 'pseudocount':
-        beta_priors = np.array([[(i + 0.5) * pseudocount / 10, (9.5 - i) * pseudocount / 10] for i in range(NUM_BINS)])
+        beta_priors = np.array([[(i + 0.5) * pseudocount / 10, (9.5 - i) * pseudocount / 10] for i in range(args.num_bins)])
 
     counts = np.array([(((Y_predict[digitized == i]) == (Y_true[digitized == i])).sum(),
                         ((Y_predict[digitized == i]) != (Y_true[digitized == i])).sum())
