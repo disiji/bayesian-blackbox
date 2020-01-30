@@ -9,6 +9,7 @@ import numpy as np
 from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
+from active_learning_topk import mean_reciprocal_rank
 from cifar100meta import superclass_lookup
 from data_utils import datafile_dict, cost_matrix_dir_dict
 from models import DirichletMultinomialCost, Model
@@ -243,21 +244,30 @@ def eval(results: np.ndarray, ground_truth: list, topk: int) -> Dict[str, np.nda
     :return:
     """
     assert len(ground_truth) == topk
-    avg_num_agreement = [None] * results.shape[1]
+    num_runs, num_evals, num_classes = results.shape
+    avg_num_agreement = [None] * num_evals
+    mrr = [None] * num_evals
 
-    for idx in range(results.shape[1]):
+    ground_truth_array = np.zeros((num_classes,), dtype=np.bool_)
+    ground_truth_array[np.array(ground_truth).astype(int)] = 1
+
+    for idx in range(num_evals):
         current_result = results[:, idx, :]
         topk_arms = np.argsort(current_result, axis=-1)[:, -topk:]
         topk_list = topk_arms.flatten().tolist()
         avg_num_agreement[idx] = len([arm for arm in topk_list if arm in ground_truth]) * 1.0 / (
-                topk * results.shape[0])
+                topk * num_runs)
+        mrr[idx] = sum([mean_reciprocal_rank(results[run_id, idx, :], ground_truth_array, 'max') for run_id in
+                        range(num_runs)]) / num_runs
     return {
         'avg_num_agreement': avg_num_agreement,
+        'mrr': mrr,
     }
 
 
 # 01 loss
 # Informative priors...avg predicted confidences by predicted class
+
 def main(args: argparse.Namespace) -> None:
     # Set random seed to ensure reproducibility of experiments
     np.random.seed(args.seed)
@@ -313,8 +323,9 @@ def main(args: argparse.Namespace) -> None:
         args.pseudocount = 3
 
     # Sampling...
-    no_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-6
-    uniform_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * args.pseudocount / dataset.num_classes
+    no_prior_alphas = np.ones((dataset.num_classes, dataset.num_classes)) * 1e-3
+    uniform_prior_alphas = np.ones(
+        (dataset.num_classes, dataset.num_classes)) * args.pseudocount / dataset.num_classes
     informed_prior_alphas = args.pseudocount * dataset.confusion_prior
     for i in tqdm(range(N_SIMULATIONS)):
         model = DirichletMultinomialCost(no_prior_alphas, costs)
@@ -352,6 +363,12 @@ def main(args: argparse.Namespace) -> None:
     active_success = eval(active_uniform_results, ground_truth, args.topk)['avg_num_agreement']
     active_informed_success = eval(active_informed_results, ground_truth, args.topk)['avg_num_agreement']
 
+    random_no_prior_mrr = eval(random_no_prior_results, ground_truth, args.topk)['mrr']
+    random_uniform_mrr = eval(random_uniform_results, ground_truth, args.topk)['mrr']
+    random_informed_mrr = eval(random_informed_results, ground_truth, args.topk)['mrr']
+    active_mrr = eval(active_uniform_results, ground_truth, args.topk)['mrr']
+    active_informed_mrr = eval(active_informed_results, ground_truth, args.topk)['mrr']
+
     # Dump results...
     np.save(args.output / f'random_no_prior_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
             random_no_prior_success)
@@ -362,6 +379,16 @@ def main(args: argparse.Namespace) -> None:
     np.save(args.output / f'active_success_top{args.topk}_pseudocount{args.pseudocount}.npy', active_success)
     np.save(args.output / f'active_informed_success_top{args.topk}_pseudocount{args.pseudocount}.npy',
             active_informed_success)
+
+    np.save(args.output / f'random_no_prior_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_no_prior_mrr)
+    np.save(args.output / f'random_uniform_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_uniform_mrr)
+    np.save(args.output / f'random_informed_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            random_informed_mrr)
+    np.save(args.output / f'active_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy', active_mrr)
+    np.save(args.output / f'active_informed_mrr_top{args.topk}_pseudocount{args.pseudocount}.npy',
+            active_informed_mrr)
 
     np.save(args.output / f'random_no_prior_confusion_log_top{args.topk}_pseudocount{args.pseudocount}.npy',
             random_no_prior_confusion_log)
@@ -384,6 +411,16 @@ def main(args: argparse.Namespace) -> None:
     axes.plot(x_axis, active_informed_success, label='active (informative prior)')
     axes.legend()
     plt.savefig(args.output / f'success_curve_top{args.topk}_pseudocount{args.pseudocount}.png')
+
+    fig, axes = plt.subplots(1, 1)
+    x_axis = np.arange(len(random_no_prior_mrr)) * LOG_FREQ
+    axes.plot(x_axis, random_no_prior_mrr, label='non-active(no prior)')
+    axes.plot(x_axis, random_uniform_mrr, label='non-active(uniform prior)')
+    axes.plot(x_axis, random_informed_mrr, label='non-active(informative prior)')
+    axes.plot(x_axis, active_mrr, label='active (uniform prior)')
+    axes.plot(x_axis, active_informed_mrr, label='active (informative prior)')
+    axes.legend()
+    plt.savefig(args.output / f'mrr_curve_top{args.topk}_pseudocount{args.pseudocount}.png')
 
     # fig, axes = plt.subplots(1, 1)
     # n_samples = 1000
