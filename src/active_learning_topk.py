@@ -27,7 +27,7 @@ FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
 RUNS = 100
 LOG_FREQ = 100
-CALIBRATION_FREQ = 1000
+CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 3
 CALIBRATION_MODEL = 'platt_scaling'
 HOLDOUT_RATIO = 0.1
@@ -170,9 +170,11 @@ def eval(args: argparse.Namespace,
 
         holdout_calibrated_ece = np.zeros((num_samples // CALIBRATION_FREQ + 1,))
 
-        if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
+        if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles',
+                                      'classwise_histogram_binning', 'two_group_histogram_binning']:
             holdout_X = np.array(holdout_confidences)
             holdout_X = np.array([1 - holdout_X, holdout_X]).T
+
         elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
             holdout_indices_array = np.array(holdout_indices, dtype=np.int)
             with process_lock:
@@ -207,6 +209,7 @@ def eval(args: argparse.Namespace,
             # before calibration
             if idx == 0:
                 holdout_calibrated_ece[idx] = eval_ece(holdout_confidences, holdout_observations, num_bins=10)
+
             else:
                 if args.calibration_model in ['histogram_binning', 'isotonic_regression', 'bayesian_binning_quantiles']:
                     calibration_model = CALIBRATION_MODELS[args.calibration_model]()
@@ -226,12 +229,40 @@ def eval(args: argparse.Namespace,
                     calibrated_holdout_confidences = calibration_model.predict_proba(holdout_X)
                     calibrated_holdout_confidences = np.take_along_axis(calibrated_holdout_confidences, pred_array,
                                                                         axis=1).squeeze().tolist()
+
                 elif args.calibration_model in ['classwise_histogram_binning']:
                     # use the current MPE reliability diagram for calibration, no need to train a separate calibration model
                     calibration_mapping = model.beta_params_mpe
                     bin_idx = np.floor(np.array(holdout_confidences) * 10).astype(int)
                     bin_idx[bin_idx == 10] = 9
-                    calibrated_holdout_confidences = calibration_mapping[holdout_categories, bin_idx]
+                    calibrated_holdout_confidences = calibration_mapping[holdout_categories, bin_idx].tolist()
+
+                elif args.calibration_model in ['two_group_histogram_binning']:
+
+                    calibrated_holdout_confidences = np.zeros(len(holdout_confidences))
+
+                    calibration_model_less_calibrated = CALIBRATION_MODELS['histogram_binning']()
+                    calibration_model_more_calibrated = CALIBRATION_MODELS['histogram_binning']()
+                    X = np.array(confidences[:idx])
+                    X = np.array([1 - X, X]).T
+                    y = np.array(observations[:idx]) * 1
+
+                    train_mask = np.array([ground_truth[val] for val in categories[:idx]])
+                    holdout_mask = np.array([ground_truth[val] for val in holdout_categories])
+
+                    calibration_model_less_calibrated.fit(X[train_mask], y[train_mask])
+                    calibration_model_more_calibrated.fit(X[np.invert(train_mask)],
+                                                          y[np.invert(train_mask)])
+
+                    calibrated_holdout_confidences[holdout_mask] = calibration_model_less_calibrated.predict_proba(
+                        holdout_X[holdout_mask])[:, 1]
+                    calibrated_holdout_confidences[
+                        np.invert(holdout_mask)] = calibration_model_more_calibrated.predict_proba(
+                        holdout_X[np.invert(holdout_mask)])[:, 1]
+
+                    calibrated_holdout_confidences = calibrated_holdout_confidences.tolist()
+                else:
+                    raise ValueError("%s is not an implemented calibration method." % args.calibration_model)
 
                 holdout_calibrated_ece[idx // CALIBRATION_FREQ] = eval_ece(calibrated_holdout_confidences,
                                                                            holdout_observations, num_bins=10)
