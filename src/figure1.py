@@ -1,17 +1,13 @@
-import argparse
-from pathlib import Path
 from typing import Any, Dict, List
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-
 DEFAULT_PLOT_KWARGS = {
     'color': 'blue',
     'linewidth': 1
 }
-
 
 DEFAULT_RC = {
     'font.size': 8,
@@ -22,7 +18,6 @@ DEFAULT_RC = {
     'axes.labelsize': 8,
     'figure.titlesize': 8
 }
-
 
 
 def hstripe(ax: mpl.axes.Axes,
@@ -126,7 +121,7 @@ def plot_figure_1(accuracy: np.ndarray,
         hstripe(axes[0], accuracy, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
         axes[0].set_title('Accuracy')
 
-        axes[1].vlines(0, -1, ece.shape[0] + 1, colors='#777777', linewidth=1, linestyle='dashed')
+        # axes[1].vlines(0, -1, ece.shape[0] + 1, colors='#777777', linewidth=1, linestyle='dashed')
         plot_kwargs = {'color': '#ff7f0e'}
         hstripe(axes[1], ece, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
         axes[1].set_title('ECE')
