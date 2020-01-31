@@ -120,7 +120,6 @@ python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py dbpedia -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py dbpedia -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
-
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
@@ -179,6 +178,9 @@ python active_learning_costs.py -topk 1 -type_cost superclass -pseudocount 100 &
 
 # figure 1
 python figure1.py
+
+# scatter plots of accuracy v.s. ece
+pythhon figure_scatter_accuracy_ece.py
 
 # complot comparison figures
 python figure_active_accuracy.py -pseudocount 2 &

@@ -129,6 +129,7 @@ def plot_figure_1(accuracy: np.ndarray,
         plot_kwargs = {'color': '#ff7f0e'}
         hstripe(axes[1], ece, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
         axes[1].set_xlim(left=0)
+        axes[1].tick_params(left=False)
         axes[1].set_title('ECE')
 
     return fig, axes
@@ -184,6 +185,7 @@ def main():
     fig, axes = plot_figure_1(accuracy, ece, labels=class_names, limit=10, reverse=False)
 
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.15, wspace=0.22)
     fig.savefig('../figures/figure1.pdf', bbox_inches="tight")
 
 

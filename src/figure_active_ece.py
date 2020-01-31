@@ -29,8 +29,8 @@ COLOR = {'non-active_no_prior': 'non-active',
          'ts_uniform': 'ts(uniform)',
          'ts_informed': 'ts(informative)'
          }
-METHOD_NAME_DICT = {'non-active': 'non-active',
-                    'ts': 'ts'}
+METHOD_NAME_DICT = {'non-active': 'Non-active',
+                    'ts': 'TS'}
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -132,19 +132,24 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                           threshold=threshold,
                           plot_kwargs=plot_kwargs)
             axes[idx].set_title(DATASET_NAMES[dataset])
+            if idx > 0:
+                axes[idx].tick_params(left=False)
             idx += 1
 
         axes[-1].legend()
-        axes[0].set_ylabel(EVAL_METRIC_NAMES[eval_metric])
+        if topk == 1:
+            axes[0].set_ylabel("least calibrated, top1")
+        else:
+            axes[0].set_ylabel("least calibrated, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 1.0)
-        fig.subplots_adjust(bottom=0.15, wspace=0.08)
+        fig.subplots_adjust(bottom=0.05, wspace=0.12)
 
     if top1:
         figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     else:
         figname = '../figures/%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
-    fig.savefig(figname, bbox_inches='tight')
+    fig.savefig(figname, bbox_inches='tight',pad_inches = 0)
 
 
 if __name__ == "__main__":
