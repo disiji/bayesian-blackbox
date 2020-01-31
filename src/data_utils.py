@@ -26,7 +26,7 @@ datasize_dict = {
     'cifar100': 10000,
     'imagenet': 50000,
     'imagenet2_topimages': 10000,
-    '20newsgroup': 5607,
+    '20newsgroup': 7532,
     'svhn': 26032,
     'dbpedia': 70000,
 }
