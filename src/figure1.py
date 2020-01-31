@@ -122,11 +122,13 @@ def plot_figure_1(accuracy: np.ndarray,
         fig, axes = plt.subplots(ncols=2, figsize=(3, 3), dpi=300, sharey=True)
         plot_kwargs = {'color': '#1f77b4'}
         hstripe(axes[0], accuracy, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
+        axes[0].set_xlim(right=1.0)
         axes[0].set_title('Accuracy')
 
         # axes[1].vlines(0, -1, ece.shape[0] + 1, colors='#777777', linewidth=1, linestyle='dashed')
         plot_kwargs = {'color': '#ff7f0e'}
         hstripe(axes[1], ece, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
+        axes[1].set_xlim(left=0)
         axes[1].set_title('ECE')
 
     return fig, axes
