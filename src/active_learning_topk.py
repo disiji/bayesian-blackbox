@@ -1,23 +1,21 @@
 import argparse
 import ctypes
 import logging
+import matplotlib.pyplot as plt
+import numpy as np
 import pathlib
 import random
 import warnings
-from collections import deque
-from functools import reduce
-from multiprocessing import Array, Lock, Process, JoinableQueue
-from typing import List, Dict, Tuple
-
-import matplotlib.pyplot as plt
-import numpy as np
-from tqdm import tqdm
-
-from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, eval_ece
+from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, get_bayesian_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
+from collections import deque
 from data_utils import datafile_dict, num_classes_dict, logits_dict, datasize_dict, prepare_data, train_holdout_split, \
     DATASET_LIST
+from functools import reduce
 from models import BetaBernoulli, ClasswiseEce
+from multiprocessing import Array, Lock, Process, JoinableQueue
+from tqdm import tqdm
+from typing import List, Dict, Tuple
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -185,7 +183,7 @@ def eval(args: argparse.Namespace,
     if args.metric == 'accuracy':
         model = BetaBernoulli(num_classes, prior)
     elif args.metric == 'calibration_error':
-        model = ClasswiseEce(num_classes, num_bins=10, pseudocount=args.pseudocount, weight=weight, prior=None)
+        model = ClasswiseEce(num_classes, num_bins=10, pseudocount=args.pseudocount, weight=weight)
 
     avg_num_agreement = np.zeros((num_samples // LOG_FREQ + 1,))
     cumulative_metric = np.zeros((num_samples // LOG_FREQ + 1,))
@@ -776,7 +774,6 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                      num_classes,
                                      num_samples,
                                      sample_method=method,
-                                     prior=None,
                                      random_seed=run_idx)
 
                 category_array = sampled_categories_dict[sample_method]
@@ -860,8 +857,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
 
     if EVAL:
         logger.info('Starting evaluation')
-        ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
-                                        topk=args.topk)
+        ground_truth = get_bayesian_ground_truth(categories, observations, confidences, num_classes, args.metric,
+                                                 args.mode, topk=args.topk, pseudocount=args.pseudocount)
 
         def eval_worker(queue):
             while not queue.empty():
@@ -880,8 +877,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                                                                   holdout_observations=holdout_observations,
                                                                   holdout_confidences=holdout_confidences,
                                                                   holdout_labels=holdout_labels,
-                                                                  holdout_indices=holdout_indices,
-                                                                  prior=None)
+                                                                  holdout_indices=holdout_indices)
 
                 # Write outputs
                 avg_num_agreement_array = avg_num_agreement_dict[method]

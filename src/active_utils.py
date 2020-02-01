@@ -1,13 +1,10 @@
-import random
-from collections import deque
-from typing import List
-import warnings
-
 import numpy as np
 import pandas as pd
-from models import BetaBernoulli
-
-
+import random
+import warnings
+from collections import deque
+from models import BetaBernoulli, ClasswiseEce
+from typing import List
 
 
 def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
@@ -96,6 +93,40 @@ def get_ground_truth(categories: List[int], observations: List[bool], confidence
         metric_val = _get_accuracy_k(categories, observations, num_classes)
     elif metric == 'calibration_error':
         metric_val = _get_ece_k(categories, observations, confidences, num_classes, num_bins=10)
+
+    output = np.zeros((num_classes,), dtype=np.bool_)
+
+    if mode == 'max':
+        indices = metric_val.argsort()[-topk:]
+    else:
+        indices = metric_val.argsort()[:topk]
+
+    output[indices] = 1
+
+    return output
+
+
+def get_bayesian_ground_truth(categories: List[int], observations: List[bool], confidences: List[float],
+                              num_classes: int,
+                              metric: str, mode: str, topk: int = 1, pseudocount:int=1, prior=None) -> np.ndarray:
+    """
+    Compute ground truth given metric and mode with all data points.
+    :param categories:
+    :param observations:
+    :param confidences:
+    :param metric:
+    :param mode:
+    :return: binary np.ndarray of shape (num_classes, ) indicating each class in top k or not.
+    """
+
+    if metric == 'accuracy':
+        model = BetaBernoulli(num_classes, prior=prior)
+        model.update_batch(scores, observations)
+    elif metric == 'calibration_error':
+        model = ClasswiseEce(num_classes, num_bins=10, pseudocount=pseudocount)
+        model.update_batch(categories, observations, confidences)
+
+    metric_val = model.eval
 
     output = np.zeros((num_classes,), dtype=np.bool_)
 
