@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from data_utils import datafile_dict, datasize_dict, num_classes_dict, prepare_data, num_classes_dict
 from data_utils import datasize_dict
-from models import BetaBernoulli, SumOfBetaEce, Model
+from models import BetaBernoulli, ClasswiseEce
 from typing import Dict, Any
 
 num_samples = 1000
@@ -106,18 +106,12 @@ def main() -> None:
             accuracy_model.update_batch(categories, observations)
 
             # ece models for each class
-            ece_models = [SumOfBetaEce(num_bins=10, weight=None, prior_alpha=None, prior_beta=None) for i in
-                          range(num_classes)]
-            for class_idx in range(num_classes):
-                mask_idx = [i for i in range(len(observations)) if categories[i] == class_idx]
-                observations_sublist = [observations[i] for i in mask_idx]
-                confidences_sublist = [confidences[i] for i in mask_idx]
-                ece_models[class_idx].update_batch(confidences_sublist, observations_sublist)
+            ece_model = ClasswiseEce(num_classes, num_bins=10, pseudocount=2)
+            ece_model.update_batch(categories, observations, confidences)
 
             # draw samples from posterior of classwise accuracy
             accuracy_samples = accuracy_model.sample(num_samples)  # (num_categories, num_samples)
-            ece_samples = np.array([ece_models[class_idx].sample(num_samples)
-                                    for class_idx in range(num_classes)]).squeeze()  # (num_categories, num_samples)
+            ece_samples = ece_model.sample(num_samples) # (num_categories, num_samples)
 
             plot_kwargs = {}
             axes[idx] = plot_scatter(axes[idx], accuracy_samples, ece_samples, limit=TOPK_DICT[dataset],
