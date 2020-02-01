@@ -190,7 +190,7 @@ class SumOfBetaEce(Model):
         return np.dot(weight * weight, variance_bin)
 
     @property
-    def frequentist_eval(self) -> None:
+    def frequentist_eval(self) -> float:
         """
         Eval ECE in a frequentist's way.
 
@@ -200,6 +200,10 @@ class SumOfBetaEce(Model):
         accuracy = self._counts[:, 0] / tmp
         weight = tmp / sum(tmp)
         return np.dot(np.abs(accuracy - self._confidence), weight)
+
+    @property
+    def counts_per_bin(self)->np.ndarray:
+        return np.sum(self._counts, axis=1)
 
     @property
     def beta_params_mpe(self) -> np.ndarray:
