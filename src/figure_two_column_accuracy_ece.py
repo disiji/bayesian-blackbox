@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from data_utils import datafile_dict, num_classes_dict, prepare_data
 from matplotlib.ticker import FormatStrFormatter
-from models import BetaBernoulli, SumOfBetaEce
+from models import BetaBernoulli, ClasswiseEce
 from typing import Any, Dict, List
 
 DEFAULT_PLOT_KWARGS = {
@@ -165,17 +165,12 @@ def main():
     accuracy_model.update_batch(categories, observations)
 
     # ece models for each class
-    ece_models = [SumOfBetaEce(num_bins=10, weight=None, prior_alpha=None, prior_beta=None) for i in range(num_classes)]
-    for class_idx in range(num_classes):
-        mask_idx = [i for i in range(len(observations)) if categories[i] == class_idx]
-        observations_sublist = [observations[i] for i in mask_idx]
-        confidences_sublist = [confidences[i] for i in mask_idx]
-        ece_models[class_idx].update_batch(confidences_sublist, observations_sublist)
+    ece_model = ClasswiseEce(num_classes, num_bins=10, pseudocount=2)
+    ece_model.update_batch(categories, observations, confidences)
 
     # draw samples from posterior of classwise accuracy
     accuracy_samples = accuracy_model.sample(num_samples)  # (num_categories, num_samples)
-    ece_samples = np.array([ece_models[class_idx].sample(num_samples)
-                            for class_idx in range(num_classes)]).squeeze()  # (num_categories, num_samples)
+    ece_samples = ece_model.sample(num_samples)  # (num_categories, num_samples)
 
     accuracy = np.array([np.quantile(accuracy_samples, 0.025, axis=1),
                          np.quantile(accuracy_samples, 0.5, axis=1),
