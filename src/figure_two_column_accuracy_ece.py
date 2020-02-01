@@ -1,11 +1,10 @@
-from typing import Any, Dict, List
-
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-
 from data_utils import datafile_dict, num_classes_dict, prepare_data
+from matplotlib.ticker import FormatStrFormatter
 from models import BetaBernoulli, SumOfBetaEce
+from typing import Any, Dict, List
 
 DEFAULT_PLOT_KWARGS = {
     'color': 'blue',
@@ -74,6 +73,8 @@ def hstripe(ax: mpl.axes.Axes,
     ax.set_ylim(-1, num_rows)
     ax.set_yticks(np.arange(num_rows))
     ax.set_yticklabels(labels)
+
+    ax.xaxis.set_major_formatter(FormatStrFormatter('%.1f'))
 
 
 def plot_figure_1(accuracy: np.ndarray,
@@ -185,7 +186,7 @@ def main():
     fig, axes = plot_figure_1(accuracy, ece, labels=class_names, limit=10, reverse=False)
 
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.15, wspace=0.22)
+    fig.subplots_adjust(bottom=0.0, wspace=0.35)
     fig.savefig('../figures/figure1.pdf', bbox_inches="tight")
 
 

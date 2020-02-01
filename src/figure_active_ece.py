@@ -43,6 +43,7 @@ DEFAULT_RC = {
     'figure.titlesize': 8,
     'xtick.labelsize': 6,
     'ytick.labelsize': 6,
+
 }
 
 DEFAULT_PLOT_KWARGS = {
@@ -143,13 +144,13 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
             axes[0].set_ylabel("least calibrated, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 1.0)
-        fig.subplots_adjust(bottom=0.05, wspace=0.12)
+        fig.subplots_adjust(bottom=0.05, wspace=0.2)
 
     if top1:
         figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     else:
         figname = '../figures/%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
-    fig.savefig(figname, bbox_inches='tight',pad_inches = 0)
+    fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 
 if __name__ == "__main__":

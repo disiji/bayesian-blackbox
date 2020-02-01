@@ -127,9 +127,8 @@ def main() -> None:
 
     axes[0].set_ylabel('ECE')
     fig.set_size_inches(TEXT_WIDTH, 1.3)
-    fig.subplots_adjust(bottom=0.05, wspace=-0.1)
-
     fig.tight_layout()
+    fig.subplots_adjust(bottom=0.05, wspace=0.25)
     figname = '../figures/scatter.pdf'
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
