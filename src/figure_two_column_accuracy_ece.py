@@ -22,6 +22,9 @@ DEFAULT_RC = {
     'axes.labelsize': 8,
     'figure.titlesize': 8
 }
+COLUMN_WIDTH = 3.25  # Inches
+TEXT_WIDTH = 6.299213  # Inches
+GOLDEN_RATIO = 1.61803398875
 
 
 def hstripe(ax: mpl.axes.Axes,
@@ -153,14 +156,14 @@ def main():
                    'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle',
                    'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
                    'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest', 'fox',
-                   'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn_mower', 'leopard', 'lion',
-                   'lizard', 'lobster', 'man', 'maple_tree', 'motorcycle', 'mountain', 'mouse', 'mushroom',
-                   'oak_tree', 'orange', 'orchid', 'otter', 'palm_tree', 'pear', 'pickup_truck', 'pine_tree',
+                   'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn mower', 'leopard', 'lion',
+                   'lizard', 'lobster', 'man', 'maple tree', 'motorcycle', 'mountain', 'mouse', 'mushroom',
+                   'oak tree', 'orange', 'orchid', 'otter', 'palm tree', 'pear', 'pickup truck', 'pine tree',
                    'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road',
                    'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
-                   'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet_pepper', 'table', 'tank', 'telephone',
+                   'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet pepper', 'table', 'tank', 'telephone',
                    'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale',
-                   'willow_tree', 'wolf', 'woman', 'worm']
+                   'willow tree', 'wolf', 'woman', 'worm']
 
     # accuracy models
     accuracy_model = BetaBernoulli(k=num_classes, prior=None)
@@ -183,8 +186,9 @@ def main():
     fig, axes = plot_figure_1(accuracy, ece, labels=class_names, limit=10, reverse=False)
 
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.0, wspace=0.35)
-    fig.savefig('../figures/figure1.pdf', bbox_inches="tight")
+    fig.subplots_adjust(bottom=-0.2, wspace=0.35)
+    fig.set_size_inches(COLUMN_WIDTH, 2.2)
+    fig.savefig('../figures/figure1.pdf', bbox_inches="tight", pad_inches=0.05)
 
 
 if __name__ == "__main__":

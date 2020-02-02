@@ -5,8 +5,6 @@ python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 1 -pseu
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 10 -pseudocount=2 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 1 -pseudocount=2 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 10 -pseudocount=2 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 1 -pseudocount=2 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 10 -pseudocount=2 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 1 -pseudocount=2 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 3 -pseudocount=2 &
 python active_learning_topk.py svhn -metric accuracy -mode min -topk 1 -pseudocount=2 &
@@ -14,25 +12,11 @@ python active_learning_topk.py svhn -metric accuracy -mode min -topk 3 -pseudoco
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 1 -pseudocount=2 &
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 3 -pseudocount=2 &
 
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 10 -pseudocount=2 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 10 -pseudocount=2 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 10 -pseudocount=2 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 3 -pseudocount=2 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 3 -pseudocount=2 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 1 -pseudocount=2 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 3 -pseudocount=2 &
 
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 1 -pseudocount=10 &
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 10 -pseudocount=10 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 1 -pseudocount=10 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 10 -pseudocount=10 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 1 -pseudocount=10 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 10 -pseudocount=10 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 1 -pseudocount=10 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 3 -pseudocount=10 &
 python active_learning_topk.py svhn -metric accuracy -mode min -topk 1 -pseudocount=10 &
@@ -40,26 +24,10 @@ python active_learning_topk.py svhn -metric accuracy -mode min -topk 3 -pseudoco
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 1 -pseudocount=10 &
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 3 -pseudocount=10 &
 
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 10 -pseudocount=10 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 10 -pseudocount=10 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 10 -pseudocount=10 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 3 -pseudocount=10 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 3 -pseudocount=10 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 1 -pseudocount=10 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 3 -pseudocount=10 &
-
-
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 1 -pseudocount=100 &
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 10 -pseudocount=100 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 1 -pseudocount=100 &
 python active_learning_topk.py imagenet -metric accuracy -mode min -topk 10 -pseudocount=100 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 1 -pseudocount=100 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode min -topk 10 -pseudocount=100 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 1 -pseudocount=100 &
 python active_learning_topk.py 20newsgroup -metric accuracy -mode min -topk 3 -pseudocount=100 &
 python active_learning_topk.py svhn -metric accuracy -mode min -topk 1 -pseudocount=100 &
@@ -67,18 +35,6 @@ python active_learning_topk.py svhn -metric accuracy -mode min -topk 3 -pseudoco
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 1 -pseudocount=100 &
 python active_learning_topk.py dbpedia -metric accuracy -mode min -topk 3 -pseudocount=100 &
 
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py cifar100 -metric accuracy -mode max -topk 10 -pseudocount=100 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py imagenet -metric accuracy -mode max -topk 10 -pseudocount=100 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py imagenet2_topimages -metric accuracy -mode max -topk 10 -pseudocount=100 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py 20newsgroup -metric accuracy -mode max -topk 3 -pseudocount=100 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py svhn -metric accuracy -mode max -topk 3 -pseudocount=100 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 1 -pseudocount=100 &
-python active_learning_topk.py dbpedia -metric accuracy -mode max -topk 3 -pseudocount=100 &
 
 # topk calibration expriments
 
@@ -86,8 +42,6 @@ python active_learning_topk.py cifar100 -metric calibration_error -mode max -top
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 0.1 &
@@ -99,8 +53,6 @@ python active_learning_topk.py cifar100 -metric calibration_error -mode max -top
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 1 &
@@ -112,8 +64,6 @@ python active_learning_topk.py cifar100 -metric calibration_error -mode max -top
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 2 &
@@ -125,8 +75,6 @@ python active_learning_topk.py cifar100 -metric calibration_error -mode max -top
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 5 &
@@ -138,8 +86,6 @@ python active_learning_topk.py cifar100 -metric calibration_error -mode max -top
 python active_learning_topk.py cifar100 -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py imagenet -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
-python active_learning_topk.py imagenet2_topimages -metric calibration_error -mode max -topk 10 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py 20newsgroup -metric calibration_error -mode max -topk 3 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
 python active_learning_topk.py svhn -metric calibration_error -mode max -topk 1 --calibration_model histogram_binning --processes 3 -pseudocount 10 &
@@ -184,7 +130,7 @@ python active_learning_costs.py -topk 1 -type_cost superclass -pseudocount 100 &
 
 #############################################################################################
 
-# figure 1
+# plot two column plots of accuracy v.s. ece
 python figure1.py
 
 # plot scatter plots of accuracy v.s. ece
