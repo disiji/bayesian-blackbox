@@ -1,10 +1,12 @@
+from typing import Any, Dict, List
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from data_utils import datafile_dict, num_classes_dict, prepare_data
 from matplotlib.ticker import FormatStrFormatter
+
+from data_utils import datafile_dict, num_classes_dict, prepare_data
 from models import BetaBernoulli, ClasswiseEce
-from typing import Any, Dict, List
 
 DEFAULT_PLOT_KWARGS = {
     'color': 'blue',

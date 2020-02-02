@@ -2,7 +2,7 @@
 METRIC = 'accuracy'
 MODE = 'min'
 
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200130/output/active_learning_topk/'
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
 RUNS = 100
 LOG_FREQ = 100
 TOPK_DICT = {'cifar100': 10,
@@ -54,12 +54,14 @@ COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 
+import argparse
+from typing import Dict, Any
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
 from data_utils import datasize_dict
-from typing import Dict, Any
-import argparse
 
 
 def plot_topk_accuracy(ax: mpl.axes.Axes,
@@ -113,7 +115,7 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
     return ax
 
 
-def main(eval_metric: str, top1: bool, pseudocount:int, threshold: float) -> None:
+def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> None:
     with mpl.rc_context(rc=DEFAULT_RC):
         fig, axes = plt.subplots(ncols=len(TOPK_DICT), dpi=300, sharey=True)
         idx = 0
@@ -139,9 +141,9 @@ def main(eval_metric: str, top1: bool, pseudocount:int, threshold: float) -> Non
 
         axes[-1].legend()
         if topk == 1:
-            axes[0].set_ylabel("least accurate, top1")
+            axes[0].set_ylabel("MRR, top1")
         else:
-            axes[0].set_ylabel("least accurate, topK")
+            axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 1.0)
         fig.subplots_adjust(bottom=0.05, wspace=0.12)
@@ -150,7 +152,7 @@ def main(eval_metric: str, top1: bool, pseudocount:int, threshold: float) -> Non
         figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     else:
         figname = '../figures/%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
-    fig.savefig(figname, bbox_inches='tight',pad_inches = 0)
+    fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 
 if __name__ == "__main__":

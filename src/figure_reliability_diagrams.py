@@ -1,13 +1,14 @@
 import argparse
+import random
+from typing import Dict, Any
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import random
-from bayesian_reliability import plot_bayesian_reliability_diagram
-from data_utils import datafile_dict, datasize_dict, prepare_data
-from models import BetaBernoulli, SumOfBetaEce
 from scipy.stats import beta
-from typing import Dict, Any
+
+from data_utils import datafile_dict, datasize_dict, prepare_data
+from models import SumOfBetaEce
 
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',
@@ -100,7 +101,9 @@ def main(args: argparse.Namespace):
 
             categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
                 datafile_dict[dataset], False)
-            confidences, observations = zip(*list(zip(confidences, observations)))
+            tmp = list(zip(confidences, observations))
+            random.shuffle(tmp)
+            confidences, observations = zip(*tmp)
 
             for (row_idx, N) in enumerate([100, 1000, datasize_dict[dataset]]):
                 print(row_idx, N)
@@ -132,7 +135,7 @@ def main(args: argparse.Namespace):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-pseudocount', type=float, default=2, help='Takes value from 2, 5, 10, and maybe 1.')
+    parser.add_argument('-pseudocount', type=int, default=2, help='Takes value from 2, 5, 10, and maybe 1.')
     args, _ = parser.parse_known_args()
 
     main(args)

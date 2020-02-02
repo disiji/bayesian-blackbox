@@ -4,7 +4,7 @@ MODE = 'max'
 HOLDOUT_RATIO = 0.1
 
 #################################
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200130/output/active_learning_topk/'
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
 RUNS = 100
 LOG_FREQ = 100
 TOPK_DICT = {'cifar100': 10,
@@ -55,11 +55,13 @@ TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 
 import argparse
+from typing import Dict, Any
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
 from data_utils import datasize_dict
-from typing import Dict, Any
 
 
 def plot_topk_ece(ax: mpl.axes.Axes,
@@ -139,9 +141,9 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
 
         axes[-1].legend()
         if topk == 1:
-            axes[0].set_ylabel("least calibrated, top1")
+            axes[0].set_ylabel("MRR, top1")
         else:
-            axes[0].set_ylabel("least calibrated, topK")
+            axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 1.0)
         fig.subplots_adjust(bottom=0.05, wspace=0.2)

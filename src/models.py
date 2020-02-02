@@ -201,8 +201,53 @@ class SumOfBetaEce(Model):
         weight = tmp / sum(tmp)
         return np.dot(np.abs(accuracy - self._confidence), weight)
 
+    def calibration_estimation_error(self, ground_truth_model) -> float:
+        """
+        Computes the difference between reliability diagram curve generated with the model and the ground truth.
+        The difference is computed by taking the weighted average of absolute difference per bin,
+            where weight is estimated empirically from ground_truth_model.
+        Accuracy per bin is computed as MPE of Beta per bin.
+        :param ground_truth_model: SumOfBetaEce
+                Ece model trained with all available data.
+        :return:
+        """
+        theta = self._alpha / (self._alpha + self._beta)
+        ground_truth_alpha, ground_truth_beta = ground_truth_model.get_params()
+        ground_truth_theta = ground_truth_alpha / (ground_truth_alpha + ground_truth_beta)
+
+        if ground_truth_model._weight is not None:  # pool weights
+            weight = ground_truth_model._weight
+        else:  # online weights
+            tmp = np.sum(ground_truth_model._counts, axis=1)
+            weight = tmp / sum(tmp)
+
+        return np.dot(np.abs(theta - ground_truth_theta), weight)
+
+    def frequentist_calibration_estimation_error(self, ground_truth_model) -> float:
+        """
+        Computes the difference between reliability diagram curve generated with the model and the ground truth.
+        The difference is computed by taking the weighted average of absolute difference per bin,
+            where weight is estimated empirically from ground_truth_model.
+        Accuracy per bin is computed in a frequentist's way.
+        :param ground_truth_model: SumOfBetaEce
+                Ece model trained with all available data.
+        :return:
+        """
+        accuracy = self._counts[:, 0] / np.sum(self._counts, axis=1)
+
+        ground_truth_alpha, ground_truth_beta = ground_truth_model.get_params()
+        ground_truth_theta = ground_truth_alpha / (ground_truth_alpha + ground_truth_beta)
+
+        if ground_truth_model._weight is not None:  # pool weights
+            weight = ground_truth_model._weight
+        else:  # online weights
+            tmp = np.sum(ground_truth_model._counts, axis=1)
+            weight = tmp / sum(tmp)
+
+        return np.dot(np.abs(accuracy - ground_truth_theta), weight)
+
     @property
-    def counts_per_bin(self)->np.ndarray:
+    def counts_per_bin(self) -> np.ndarray:
         return np.sum(self._counts, axis=1)
 
     @property

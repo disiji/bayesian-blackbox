@@ -1,21 +1,23 @@
 import argparse
 import ctypes
 import logging
-import matplotlib.pyplot as plt
-import numpy as np
 import pathlib
 import random
 import warnings
+from collections import deque
+from functools import reduce
+from multiprocessing import Array, Lock, Process, JoinableQueue
+from typing import List, Dict, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
+
 from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, get_bayesian_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
-from collections import deque
 from data_utils import datafile_dict, num_classes_dict, logits_dict, datasize_dict, prepare_data, train_holdout_split, \
     DATASET_LIST
-from functools import reduce
 from models import BetaBernoulli, ClasswiseEce
-from multiprocessing import Array, Lock, Process, JoinableQueue
-from tqdm import tqdm
-from typing import List, Dict, Tuple
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches

@@ -1,11 +1,11 @@
-import argparse
+from typing import Dict, Any
+
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from data_utils import datafile_dict, datasize_dict, num_classes_dict, prepare_data, num_classes_dict
-from data_utils import datasize_dict
+
+from data_utils import datafile_dict, prepare_data, num_classes_dict
 from models import BetaBernoulli, ClasswiseEce
-from typing import Dict, Any
 
 num_samples = 1000
 
@@ -111,7 +111,7 @@ def main() -> None:
 
             # draw samples from posterior of classwise accuracy
             accuracy_samples = accuracy_model.sample(num_samples)  # (num_categories, num_samples)
-            ece_samples = ece_model.sample(num_samples) # (num_categories, num_samples)
+            ece_samples = ece_model.sample(num_samples)  # (num_categories, num_samples)
 
             plot_kwargs = {}
             axes[idx] = plot_scatter(axes[idx], accuracy_samples, ece_samples, limit=TOPK_DICT[dataset],

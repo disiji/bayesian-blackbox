@@ -1,13 +1,12 @@
 import argparse
 import csv
-import multiprocessing
-import os
-from typing import Tuple, Dict, List
-
 import matplotlib.pyplot as plt
+import multiprocessing
 import numpy as np
+import os
 from data_utils import datafile_dict, datasize_dict, output_str_dict, DATASET_LIST
 from scipy import stats
+from typing import Tuple, Dict, List
 
 num_cores = multiprocessing.cpu_count()
 NUM_BINS = 10
@@ -79,7 +78,8 @@ def bayesian_assessment(args: argparse.Namespace,
     if args.prior_type == 'fixed_var':
         beta_priors = np.array([BetaParams((i + 0.5) / args.num_bins, var) for i in range(args.num_bins)])
     elif args.prior_type == 'pseudocount':
-        beta_priors = np.array([[(i + 0.5) * pseudocount / 10, (9.5 - i) * pseudocount / 10] for i in range(args.num_bins)])
+        beta_priors = np.array(
+            [[(i + 0.5) * pseudocount / 10, (9.5 - i) * pseudocount / 10] for i in range(args.num_bins)])
 
     counts = np.array([(((Y_predict[digitized == i]) == (Y_true[digitized == i])).sum(),
                         ((Y_predict[digitized == i]) != (Y_true[digitized == i])).sum())
@@ -103,51 +103,6 @@ def bayesian_assessment(args: argparse.Namespace,
         'beta_posterior_p025': beta_posterior_p025,
         'beta_posterior_p975': beta_posterior_p975,
     }
-
-
-def plot_bayesian_reliability_diagram(args: argparse.Namespace,
-                                      confidence: np.ndarray,
-                                      Y_predict: np.ndarray,
-                                      Y_true: np.ndarray,
-                                      figname: str,
-                                      var: int = None,
-                                      pseudocount: int = None) -> None:
-    output = bayesian_assessment(args, confidence, Y_predict, Y_true, var, pseudocount)
-
-    fig, ax1 = plt.subplots(figsize=(4.3, 3))
-    color = 'tab:red'
-    # ax1.grid(True)
-    ax1.scatter([i + 0.5 for i in range(args.num_bins)], output['empirical_accuracy'], label="Frequentist", marker="^",
-                s=100)
-    ax1.plot([i + 0.5 for i in range(args.num_bins)], output['beta_posteriors_mean'], c="r", linestyle="--")
-    ax1.errorbar([i + 0.5 for i in range(args.num_bins)],
-                 output['beta_posteriors_mean'],
-                 yerr=(output['beta_posteriors_mean'] - output['beta_posterior_p025'],
-                       output['beta_posterior_p975'] - output['beta_posteriors_mean']),
-                 fmt='o', color='r', label="Bayesian")
-    ax1.plot(np.linspace(0, 1, args.num_bins + 1), linestyle="--", linewidth=3, c="gray")
-    ax1.fill_between([i + 0.5 for i in range(args.num_bins)], output['beta_posteriors_mean'], \
-                     np.linspace(0, 1, args.num_bins + 1)[:-1] + 0.05, color="gray", alpha=0.3)
-    # ax1.legend(loc='upper left', prop={'size': 10})
-    ax1.set_xlim((0.0, args.num_bins))
-    ax1.set_xlabel("Score(Model Confidence)", fontsize=14)
-    ax1.set_xticks(range(args.num_bins + 1))
-    ax1.set_xticklabels(["%.1f" % i for i in np.linspace(0, 1, args.num_bins + 1)])
-    ax1.set_ylim((0.0, 1.0))
-    ax1.set_ylabel("Estimated Accuracy", fontsize=14)
-
-    # add histogram to the reliability diagram
-    ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
-    color = 'tab:blue'
-    ax2.bar([i + 0.5 for i in range(args.num_bins)], output['density_bins'], color=color, alpha=0.5, label="Histogram",
-            width=1.0)
-    ax2.set_ylabel('Histogram', color=color, fontsize=12)
-    ax2.set_ylim((0.0, 2.0))
-    ax2.set_yticks([0, 1.0])
-    ax2.set_yticklabels([0, 1.0], color=color)
-    ax2.yaxis.set_label_coords(1.01, 0.25)
-    plt.tight_layout()
-    plt.savefig(figname)
 
 
 def compute_estimation_error(args: argparse.Namespace,
@@ -253,24 +208,6 @@ def run_true_calibration_error(args: argparse.Namespace) -> None:
                           [args.dataset, 'unweighted', results['unweighted_calibration_error']]])
 
 
-def run_reliability_diagrams(args: argparse.Namespace) -> None:
-    VAR_list = [0.01, 0.05, 0.10, 0.25]  # takes value from (0, 0.25); variance of beta prior
-    PSEUDOCOUNT = [0.1, 1, 10]
-    N_list = [100, 1000, datasize_dict[args.dataset]]
-
-    for N in N_list:
-        confidence, Y_predict, Y_true = prepare_data(datafile_dict[args.dataset], N)
-        if PRIORTYPE == 'fixed_var':
-            for var in VAR_list:
-                figname = args.fig_output + "reliability_plot_%s_N%d_VAR%.2f.pdf" % (args.dataset, N, var)
-                plot_bayesian_reliability_diagram(args, confidence, Y_predict, Y_true, figname, var=var)
-        elif PRIORTYPE == 'pseudocount':
-            for pseudo_n in PSEUDOCOUNT:
-                figname = args.fig_output + "reliability_plot_%s_N%d_PseudoCount%.1f.pdf" % (
-                    args.dataset, N, pseudo_n)
-                plot_bayesian_reliability_diagram(args, confidence, Y_predict, Y_true, figname, pseudocount=pseudo_n)
-
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
@@ -285,11 +222,8 @@ if __name__ == "__main__":
     if args.dataset not in DATASET_LIST:
         raise ValueError("%s is not in DATASET_LIST." % args.dataset)
 
-    run_reliability_diagrams(args)
-
-    # for DATASET in DATASET_LIST:
-    # run_reliability_diagrams(DATASET, PRIORTYPE)
-    # run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS)
-    # run_true_calibration_error(DATASET)
-    # results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
-    #                                      for DATASET in DATASET_LIST)
+    for DATASET in DATASET_LIST:
+        run_calibration_error(args)
+        run_true_calibration_error(args)
+        # results = Parallel(n_jobs=num_cores)(delayed(run_calibration_error(DATASET, PRIORTYPE, NUM_RUNS))
+        #                                      for DATASET in DATASET_LIST)
