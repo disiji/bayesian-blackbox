@@ -134,7 +134,8 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                           int(datasize_dict[dataset] * (1 - HOLDOUT_RATIO)),
                           threshold=threshold,
                           plot_kwargs=plot_kwargs)
-            axes[idx].set_title(DATASET_NAMES[dataset])
+            if topk == 1:
+                axes[idx].set_title(DATASET_NAMES[dataset])
             if idx > 0:
                 axes[idx].tick_params(left=False)
             idx += 1

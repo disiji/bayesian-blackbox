@@ -201,7 +201,7 @@ class SumOfBetaEce(Model):
         weight = tmp / sum(tmp)
         return np.dot(np.abs(accuracy - self._confidence), weight)
 
-    def calibration_estimation_error(self, ground_truth_model) -> float:
+    def calibration_estimation_error(self, ground_truth_model, online_weight=False) -> float:
         """
         Computes the difference between reliability diagram curve generated with the model and the ground truth.
         The difference is computed by taking the weighted average of absolute difference per bin,
@@ -215,15 +215,23 @@ class SumOfBetaEce(Model):
         ground_truth_alpha, ground_truth_beta = ground_truth_model.get_params()
         ground_truth_theta = ground_truth_alpha / (ground_truth_alpha + ground_truth_beta)
 
-        if ground_truth_model._weight is not None:  # pool weights
-            weight = ground_truth_model._weight
-        else:  # online weights
-            tmp = np.sum(ground_truth_model._counts, axis=1)
-            weight = tmp / sum(tmp)
+
+        if online_weight:
+            if self._weight is not None:  # pool weights
+                weight = self._weight
+            else:  # online weights
+                tmp = np.sum(self._counts, axis=1)
+                weight = tmp / sum(tmp)
+        else:
+            if ground_truth_model._weight is not None:  # pool weights
+                weight = ground_truth_model._weight
+            else:  # online weights
+                tmp = np.sum(ground_truth_model._counts, axis=1)
+                weight = tmp / sum(tmp)
 
         return np.dot(np.abs(theta - ground_truth_theta), weight)
 
-    def frequentist_calibration_estimation_error(self, ground_truth_model) -> float:
+    def frequentist_calibration_estimation_error(self, ground_truth_model, online_weight=False) -> float:
         """
         Computes the difference between reliability diagram curve generated with the model and the ground truth.
         The difference is computed by taking the weighted average of absolute difference per bin,
@@ -238,11 +246,18 @@ class SumOfBetaEce(Model):
         ground_truth_alpha, ground_truth_beta = ground_truth_model.get_params()
         ground_truth_theta = ground_truth_alpha / (ground_truth_alpha + ground_truth_beta)
 
-        if ground_truth_model._weight is not None:  # pool weights
-            weight = ground_truth_model._weight
-        else:  # online weights
-            tmp = np.sum(ground_truth_model._counts, axis=1)
-            weight = tmp / sum(tmp)
+        if online_weight:
+            if self._weight is not None:  # pool weights
+                weight = self._weight
+            else:  # online weights
+                tmp = np.sum(self._counts, axis=1)
+                weight = tmp / sum(tmp)
+        else:
+            if ground_truth_model._weight is not None:  # pool weights
+                weight = ground_truth_model._weight
+            else:  # online weights
+                tmp = np.sum(ground_truth_model._counts, axis=1)
+                weight = tmp / sum(tmp)
 
         return np.dot(np.abs(accuracy - ground_truth_theta), weight)
 

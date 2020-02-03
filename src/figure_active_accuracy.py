@@ -102,7 +102,7 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
         if method == benchmark:
             if method == benchmark:
                 if max(metric_eval) > threshold:
-                    cutoff = list(map(lambda i: i > threshold, metric_eval.tolist()[50:])).index(True) + 50
+                    cutoff = list(map(lambda i: i > threshold, metric_eval.tolist()[10:])).index(True) + 10
                     cutoff = min(int(cutoff * 1.5), len(metric_eval) - 1)
                 else:
                     cutoff = len(metric_eval) - 1
@@ -134,7 +134,8 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                                datasize_dict[dataset],
                                threshold=threshold,
                                plot_kwargs=plot_kwargs)
-            axes[idx].set_title(DATASET_NAMES[dataset])
+            if topk == 1:
+                axes[idx].set_title(DATASET_NAMES[dataset])
             if idx > 0:
                 axes[idx].tick_params(left=False)
             idx += 1
