@@ -16,7 +16,7 @@ from models import DirichletMultinomialCost, Model
 
 logger = logging.getLogger(__name__)
 
-LOG_FREQ = 100
+LOG_FREQ = 10
 N_SIMULATIONS = 100
 
 
