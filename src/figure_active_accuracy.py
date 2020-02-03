@@ -31,7 +31,7 @@ METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
                     #                         'non-active_uniform': 'non-active_uniform',
                     #                         'non-active_informed': 'non-active_informed',
                     'ts_uniform': 'TS (uniform)',
-                    # 'ts_informed': 'TS (informative)'
+                    'ts_informed': 'TS (informative)'
                     }
 DEFAULT_RC = {
     'font.size': 8,
@@ -71,7 +71,8 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
                        eval_metric: str,
                        pool_size: int,
                        threshold: float,
-                       plot_kwargs: Dict[str, Any] = {}) -> None:
+                       plot_kwargs: Dict[str, Any] = {},
+                       plot_informed: bool = False) -> None:
     """
     Replicates Figure 2 in [CITE PAPER].
 
@@ -93,9 +94,14 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
     _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
     _plot_kwargs.update(plot_kwargs)
 
-    benchmark = 'ts_uniform'
+    if plot_informed:
+        benchmark = 'ts_informed'
+        method_list = ['non-active_no_prior', 'ts_uniform', 'ts_informed']
+    else:
+        benchmark = 'ts_uniform'
+        method_list = ['non-active_no_prior', 'ts_uniform']
 
-    for method in METHOD_NAME_DICT:
+    for method in method_list:
         metric_eval = np.load(
             RESULTS_DIR + experiment_name + ('%s_%s.npy' % (eval_metric, method))).mean(axis=0)
         x = np.arange(len(metric_eval)) * LOG_FREQ / pool_size
@@ -113,7 +119,7 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
     ax.set_ylim(0, 1.0)
     xmin, xmax = ax.get_xlim()
     step = ((xmax - xmin) / 4.0001)
-    ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
+    ax.xaxis.set_maj or_formatter(ticker.PercentFormatter(xmax=1))
     ax.xaxis.set_ticks(np.arange(xmin, xmax + 0.001, step))
     ax.yaxis.set_ticks(np.arange(0, 1.01, 0.20))
     ax.tick_params(pad=0.25, length=1.5)
@@ -164,6 +170,46 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 
+def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
+    with mpl.rc_context(rc=DEFAULT_RC):
+        fig, axes = plt.subplots(ncols=2, nrows=2, dpi=300, sharey=True)
+        for idx, dataset in enumerate(['imagenet', 'svhn']):
+            plot_kwargs = {}
+
+            experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f/' % \
+                              (dataset, METRIC, MODE, 1, RUNS, pseudocount)
+            plot_topk_accuracy(axes[0, idx],
+                               experiment_name,
+                               eval_metric,
+                               datasize_dict[dataset],
+                               threshold=threshold,
+                               plot_kwargs=plot_kwargs,
+                               plot_informed=True)
+            experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f/' % \
+                              (dataset, METRIC, MODE, TOPK_DICT[dataset], RUNS, pseudocount)
+            plot_topk_accuracy(axes[1, idx],
+                               experiment_name,
+                               eval_metric,
+                               datasize_dict[dataset],
+                               threshold=threshold,
+                               plot_kwargs=plot_kwargs,
+                               plot_informed=True)
+        axes[1, 1].legend()
+        axes[0, 0].set_ylabel("MRR, top1")
+        axes[1, 0].set_ylabel("MRR, topK")
+        axes[1, 0].set_xlabel("#queries")
+        axes[1, 1].set_xlabel("#queries")
+        axes[0, 0].set_title(DATASET_NAMES['imagenet'])
+        axes[0, 1].set_title(DATASET_NAMES['svhn'])
+        fig.tight_layout()
+        fig.set_size_inches(COLUMN_WIDTH * 0.9, 2.0)
+        fig.subplots_adjust(wspace=0.20)
+
+
+    figname = '../figures/informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+    fig.savefig(figname, bbox_inches='tight', pad_inches=0)
+
+
 if __name__ == "__main__":
     threshold = 0.98  # threshold for x-axis cutoff
     parser = argparse.ArgumentParser()
@@ -173,3 +219,4 @@ if __name__ == "__main__":
     for eval_metric in ['avg_num_agreement', 'mrr']:
         for top1 in [True, False]:
             main(eval_metric, top1, args.pseudocount, threshold)
+        main_informed(eval_metric, args.pseudocount, threshold)

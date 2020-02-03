@@ -114,7 +114,7 @@ def plot_cost_matrix(new_idx):
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.4, 2.4)
 
-    fig.savefig('../figures/cost/cost_matrix.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_matrix.pdf', bbox_inches='tight')
 
 
 def plot_comparison():
@@ -137,7 +137,7 @@ def plot_comparison():
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.6, 2.4)
 
-    fig.savefig('../figures/cost/cost_comparison.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_comparison.pdf', bbox_inches='tight')
 
 
 def plot_confusion(new_idx):
@@ -183,7 +183,7 @@ def plot_confusion(new_idx):
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.9, 2.4)
 
-    fig.savefig('../figures/cost/cost_confusion_matrix.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_confusion_matrix.pdf', bbox_inches='tight')
 
 
 def main():
