@@ -20,10 +20,10 @@ def main(args) -> None:
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
         datafile_dict[args.dataset], False)
     # train a ground_truth ece model
-    if args.ground_truth_type == 'frequentist':
-        ground_truth_model = SumOfBetaEce(num_bins=args.num_bins, pseudocount=1e-3)
-    else:
+    if args.ground_truth_type == 'bayesian':
         ground_truth_model = SumOfBetaEce(num_bins=args.num_bins, pseudocount=args.pseudocount)
+    else:
+        ground_truth_model = SumOfBetaEce(num_bins=args.num_bins, pseudocount=1e-3)
     ground_truth_model.update_batch(confidences, observations)
 
     results = np.zeros((len(N_list), 5))
@@ -43,12 +43,12 @@ def main(args) -> None:
             results[i, 0] += N_list[i]
             results[i, 1] += model.eval
             results[i, 2] += model.frequentist_eval
-            results[i, 3] += model.calibration_estimation_error(ground_truth_model, args.online_weight)
-            results[i, 4] += model.frequentist_calibration_estimation_error(ground_truth_model, args.online_weight)
+            results[i, 3] += model.calibration_estimation_error(ground_truth_model, args.weight_type)
+            results[i, 4] += model.frequentist_calibration_estimation_error(ground_truth_model, args.weight_type)
 
     OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
-    print("=======", args.online_weight)
-    if args.online_weight:
+
+    if args.weight_type == 'online':
         OUTPUT_DIR += "online_weights/"
     try:
         os.stat(OUTPUT_DIR)
@@ -71,9 +71,9 @@ if __name__ == "__main__":
     parser.add_argument('dataset', type=str, default='cifar100', help='input dataset')
     parser.add_argument('-pseudocount', type=int, default=1, help='strength of prior')
     parser.add_argument('-ground_truth_type', type=str, default='bayesian',
-                        help='compute ground truth in a Bayesian or frequentist way')
-    parser.add_argument('-online_weight', type=bool, default=False,
-                        help='weigh each bin with all data or only data seen so far')
+                        help='compute ground truth in a Bayesian or frequentist way, bayesian or frequentist')
+    parser.add_argument('-weight_type', type=str, default='pool',
+                        help='weigh each bin with all data or only data seen so far, online or pool')
     parser.add_argument('--num_runs', type=int, default=NUM_RUNS, help='number of runs')
     parser.add_argument('--num_bins', type=int, default=NUM_BINS, help='number of bins in reliability diagram')
 

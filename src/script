@@ -153,24 +153,24 @@ python figure_reliability_diagrams.py -pseudocount 10 &
 python figure_reliability_diagrams.py -pseudocount 100 &
 
 # plot calibration error from bayesian/frequentist reliability diagrams
-python bayesian_reliability_comparison.py cifar100 -pseudocount 1 --ground_truth_type frequentist --online_weight False &
-python bayesian_reliability_comparison.py imagenet -pseudocount 1 --ground_truth_type frequentist --online_weight False &
-python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 --ground_truth_type frequentist --online_weight False &
-python bayesian_reliability_comparison.py svhn -pseudocount 1 --ground_truth_type frequentist --online_weight False &
-python bayesian_reliability_comparison.py dbpedia -pseudocount 1 --ground_truth_type frequentist --online_weight False &
-python bayesian_reliability_comparison.py cifar100 -pseudocount 1 --ground_truth_type bayesian --online_weight False &
-python bayesian_reliability_comparison.py imagenet -pseudocount 1 --ground_truth_type bayesian --online_weight False &
-python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 --ground_truth_type bayesian --online_weight False &
-python bayesian_reliability_comparison.py svhn -pseudocount 1 --ground_truth_type bayesian --online_weight False &
-python bayesian_reliability_comparison.py dbpedia -pseudocount 1 --ground_truth_type bayesian --online_weight False &
+python bayesian_reliability_comparison.py cifar100 -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
+python bayesian_reliability_comparison.py imagenet -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
+python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
+python bayesian_reliability_comparison.py svhn -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
+python bayesian_reliability_comparison.py dbpedia -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
+python bayesian_reliability_comparison.py cifar100 -pseudocount 1 -ground_truth_type bayesian -weight_type pool &
+python bayesian_reliability_comparison.py imagenet -pseudocount 1 -ground_truth_type bayesian -weight_type pool &
+python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 -ground_truth_type bayesian -weight_type pool &
+python bayesian_reliability_comparison.py svhn -pseudocount 1 -ground_truth_type bayesian -weight_type pool &
+python bayesian_reliability_comparison.py dbpedia -pseudocount 1 -ground_truth_type bayesian -weight_type pool &
 
-python bayesian_reliability_comparison.py cifar100 -pseudocount 1 --ground_truth_type frequentist --online_weight True &
-python bayesian_reliability_comparison.py imagenet -pseudocount 1 --ground_truth_type frequentist --online_weight True &
-python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 --ground_truth_type frequentist --online_weight True &
-python bayesian_reliability_comparison.py svhn -pseudocount 1 --ground_truth_type frequentist --online_weight True &
-python bayesian_reliability_comparison.py dbpedia -pseudocount 1 --ground_truth_type frequentist --online_weight True &
-python bayesian_reliability_comparison.py cifar100 -pseudocount 1 --ground_truth_type bayesian --online_weight True &
-python bayesian_reliability_comparison.py imagenet -pseudocount 1 --ground_truth_type bayesian --online_weight True &
-python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 --ground_truth_type bayesian --online_weight True &
-python bayesian_reliability_comparison.py svhn -pseudocount 1 --ground_truth_type bayesian --online_weight True &
-python bayesian_reliability_comparison.py dbpedia -pseudocount 1 --ground_truth_type bayesian --online_weight True &
+python bayesian_reliability_comparison.py cifar100 -pseudocount 1 -ground_truth_type frequentist -weight_type online &
+python bayesian_reliability_comparison.py imagenet -pseudocount 1 -ground_truth_type frequentist -weight_type online &
+python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 -ground_truth_type frequentist -weight_type online &
+python bayesian_reliability_comparison.py svhn -pseudocount 1 -ground_truth_type frequentist -weight_type online &
+python bayesian_reliability_comparison.py dbpedia -pseudocount 1 -ground_truth_type frequentist -weight_type online &
+python bayesian_reliability_comparison.py cifar100 -pseudocount 1 -ground_truth_type bayesian -weight_type online &
+python bayesian_reliability_comparison.py imagenet -pseudocount 1 -ground_truth_type bayesian -weight_type online &
+python bayesian_reliability_comparison.py 20newsgroup -pseudocount 1 -ground_truth_type bayesian -weight_type online &
+python bayesian_reliability_comparison.py svhn -pseudocount 1 -ground_truth_type bayesian -weight_type online &
+python bayesian_reliability_comparison.py dbpedia -pseudocount 1 -ground_truth_type bayesian -weight_type online &

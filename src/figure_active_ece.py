@@ -36,16 +36,14 @@ DEFAULT_RC = {
     'font.family': 'serif',
     'font.serif': ['Times'],
     # 'text.usetex': True,
-    'axes.titlesize': 8,
-    'axes.labelsize': 8,
+    'axes.titlesize': 6,
+    'axes.labelsize': 6,
     'legend.fontsize': 5,
     'legend.loc': 'lower right',
     'figure.titlesize': 8,
-    'xtick.labelsize': 6,
-    'ytick.labelsize': 6,
-
+    'xtick.labelsize': 4,
+    'ytick.labelsize': 4,
 }
-
 DEFAULT_PLOT_KWARGS = {
     'linewidth': 1
 }
@@ -59,6 +57,7 @@ from typing import Dict, Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 
 from data_utils import datasize_dict
@@ -106,11 +105,14 @@ def plot_topk_ece(ax: mpl.axes.Axes,
             else:
                 cutoff = len(metric_eval) - 1
 
-    print(metric_eval.shape, LOG_FREQ, pool_size)
     ax.set_xlim(0, cutoff * LOG_FREQ / pool_size)
     ax.set_ylim(0, 1.0)
-    # ax.xaxis.set_ticks(np.arange(0, cutoff * LOG_FREQ / pool_size, 0.20))
+    xmin, xmax = ax.get_xlim()
+    step = ((xmax - xmin) / 4.0001)
+    ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
+    ax.xaxis.set_ticks(np.arange(xmin, xmax + 0.001, step))
     ax.yaxis.set_ticks(np.arange(0, 1.01, 0.20))
+    ax.tick_params(pad=0.25, length=1.5)
 
     return ax
 
@@ -136,6 +138,8 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                           plot_kwargs=plot_kwargs)
             if topk == 1:
                 axes[idx].set_title(DATASET_NAMES[dataset])
+            else:
+                axes[idx].set_xlabel("#queries")
             if idx > 0:
                 axes[idx].tick_params(left=False)
             idx += 1
@@ -147,7 +151,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.8)
-        fig.subplots_adjust(bottom=0.05, wspace=0.2)
+        fig.subplots_adjust(bottom=0.05, wspace=0.20)
 
     if top1:
         figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
