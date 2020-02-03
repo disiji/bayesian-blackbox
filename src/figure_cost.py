@@ -2,6 +2,7 @@ from typing import Dict, Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 import numpy as np
 
 from cifar100meta import *
@@ -24,14 +25,14 @@ DEFAULT_RC = {
     'legend.fontsize': 5,
     'legend.loc': 'lower right',
     'figure.titlesize': 6,
-    'xtick.labelsize': 3,
-    'ytick.labelsize': 3,
+    'xtick.labelsize': 4,
+    'ytick.labelsize': 4,
 }
 DEFAULT_PLOT_KWARGS = {
 }
 
 COLUMN_WIDTH = 3.25  # Inche
-LOG_FREQ = 100
+LOG_FREQ = 10
 
 
 def plot_topk_cost(ax: mpl.axes.Axes,
@@ -69,18 +70,22 @@ def plot_topk_cost(ax: mpl.axes.Axes,
         x = np.arange(len(metric_eval)) * LOG_FREQ / pool_size
         ax.plot(x, metric_eval, label=METHOD_NAME_DICT[method], **_plot_kwargs)
 
-        if method == benchmark:
-            cutoff = len(metric_eval) - 1
-            if max(metric_eval) > threshold:
-                cutoff = list(map(lambda i: i > threshold, metric_eval.tolist()[10:])).index(True) + 10
-                cutoff = min(int(cutoff * 1.5), len(metric_eval) - 1)
+        # if method == benchmark:
+        #     cutoff = len(metric_eval) - 1
+        #     if max(metric_eval) > threshold:
+        #         cutoff = list(map(lambda i: i > threshold, metric_eval.tolist()[10:])).index(True) + 10
+        #         cutoff = min(int(cutoff * 1.5), len(metric_eval) - 1)
 
     cutoff = len(metric_eval) - 1
     print(cutoff * LOG_FREQ / pool_size)
     ax.set_xlim(0, cutoff * LOG_FREQ / pool_size)
     ax.set_ylim(0, 1.0)
-    ax.xaxis.set_ticks(np.arange(0, cutoff * LOG_FREQ / pool_size, 0.10))
+    xmin, xmax = ax.get_xlim()
+    step = ((xmax - xmin) / 4.0001)
+    ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
+    ax.xaxis.set_ticks(np.arange(xmin, xmax + 0.001, step))
     ax.yaxis.set_ticks(np.arange(0, 1.01, 0.20))
+    ax.tick_params(pad=0.25, length=1.5)
 
     return ax
 
@@ -92,9 +97,9 @@ def plot_cost_matrix(new_idx):
         _plot_kwargs.update(plot_kwargs)
         fig, axes = plt.subplots(2, 1, sharex=True)
 
-        axes[0].imshow(np.load(DATA_DIR + 'cifar100_people_full/costs.npy')[:, new_idx][new_idx, :].T,
+        axes[0].imshow(np.load(DATA_DIR + 'cifar100_people_full/costs.npy')[:, new_idx][new_idx, :],
                        **_plot_kwargs)
-        axes[1].imshow(np.load(DATA_DIR + 'cifar100_superclass_full/costs.npy')[:, new_idx][new_idx, :].T,
+        axes[1].imshow(np.load(DATA_DIR + 'cifar100_superclass_full/costs.npy')[:, new_idx][new_idx, :],
                        **_plot_kwargs)
 
         axes[0].text(-26, 50, "Human", verticalalignment='center', rotation=90)
@@ -114,7 +119,7 @@ def plot_cost_matrix(new_idx):
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.4, 2.4)
 
-    fig.savefig('../figures/cost_matrix.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_matrix.pdf', bbox_inches='tight', pad_inches=0)
 
 
 def plot_comparison():
@@ -137,7 +142,7 @@ def plot_comparison():
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.6, 2.4)
 
-    fig.savefig('../figures/cost_comparison.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_comparison.pdf', bbox_inches='tight', pad_inches=0)
 
 
 def plot_confusion(new_idx):
@@ -156,7 +161,7 @@ def plot_confusion(new_idx):
             else:
                 prior = np.ones((100, 100)) * 1. / 10
 
-            for (i, num_samples) in enumerate([9, 99, 99]):
+            for (i, num_samples) in enumerate([9, 99, 999]):
 
                 matrix = matrices[num_samples] + prior
                 matrix = matrix / matrix.sum(axis=1)[:, np.newaxis]
@@ -183,7 +188,7 @@ def plot_confusion(new_idx):
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.9, 2.4)
 
-    fig.savefig('../figures/cost_confusion_matrix.pdf', bbox_inches='tight')
+    fig.savefig('../figures/cost_confusion_matrix.pdf', bbox_inches='tight', pad_inches=0)
 
 
 def main():

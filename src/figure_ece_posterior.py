@@ -1,10 +1,10 @@
-import random
 from typing import Dict, Any
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import numpy as np
 
-from data_utils import datafile_dict, prepare_data, num_classes_dict
+from data_utils import datafile_dict, prepare_data
 from models import SumOfBetaEce
 
 DATASET_NAMES = {
@@ -22,15 +22,22 @@ DEFAULT_RC = {
     # 'text.usetex': True,
     'axes.titlesize': 6,
     'axes.labelsize': 5,
-    'legend.fontsize': 5,
+    'legend.fontsize': 4,
     'legend.loc': 'upper right',
     'figure.titlesize': 6,
-    'xtick.labelsize': 3,
-    'ytick.labelsize': 3,
+    'xtick.labelsize': 4,
+    'ytick.labelsize': 4,
 }
 DEFAULT_PLOT_KWARGS = {
     'linewidth': 1,
     'linestyle': "--",
+}
+PRECOMPUTED_GROUND_TRUTH_ECE = {
+    'cifar100': 0.09869599923480106,
+    'imagenet': 0.05007696763512674,
+    'svhn': 0.01095047338003833,
+    '20newsgroup': 0.09242892818137771,
+    'dbpedia': 0.002903918643656106,
 }
 num_bins = 10
 COLUMN_WIDTH = 3.25  # Inches
@@ -44,14 +51,28 @@ N_list = [100, 1000, 10000]
 num_samples = 1000
 
 
-def plot_ece_samples(ax, samples_prior, samples_posterior, plot_kwargs: Dict[str, Any] = {}):
+def plot_ece_samples(ax: mpl.axes.Axes,
+                     ground_truth_ece: float,
+                     frequentist_estimation: float,
+                     samples_posterior: np.ndarray,
+                     plot_kwargs: Dict[str, Any] = {}) -> mpl.axes.Axes:
+    """
+
+    :param ax:
+    :param ground_truth_ece:
+    :param frequentist_estimation:
+    :param samples_posterior:
+    :param plot_kwargs:
+    :return:
+    """
     _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
     _plot_kwargs.update(plot_kwargs)
-
     # ax.hist(samples_prior, color='blue', label='prior', **_plot_kwargs)
-    ax.hist(samples_posterior, color='red', label='posterior', **_plot_kwargs)
+    ax.hist(samples_posterior, color='red', label='Bayesian', **_plot_kwargs)
+    ax.axvline(x=frequentist_estimation, label='Frequentist', color='blue', **_plot_kwargs)
+    ax.axvline(x=ground_truth_ece, label='Ground truth', color='black', **_plot_kwargs)
     ax.set_xlim(0, 0.3)
-    ax.legend()
+    ax.set_xticks([0.0, 0.1, 0.2, 0.3])
 
     return ax
 
@@ -75,22 +96,26 @@ def main():
             tmp = 0 if i == 0 else N_list[i - 1]
             ece_model.update_batch(confidences[tmp: N_list[i]], observations[tmp: N_list[i]])
             samples_posterior = ece_model.sample(num_samples)
+            frequentist_ece = ece_model.frequentist_eval
+            ground_truth_ece = PRECOMPUTED_GROUND_TRUTH_ECE[dataset]
 
             plot_kwargs = {}
             axes[i, 0] = plot_bayesian_reliability_diagram(axes[i, 0], ece_model, plot_kwargs=plot_kwargs)
-            axes[i, 0].set_xlabel("Score(Model Confidence)")
             axes[i, 0].set_ylabel("Accuracy")
-            axes[i, 1] = plot_ece_samples(axes[i, 1], samples_prior, samples_posterior, plot_kwargs=plot_kwargs)
-            axes[i, 1].set_xlabel("ECE")
+            axes[i, 1] = plot_ece_samples(axes[i, 1], ground_truth_ece, frequentist_ece, samples_posterior, plot_kwargs=plot_kwargs)
             axes[i, 1].tick_params(left=False)
             axes[i, 1].tick_params(labelleft=False)
             # axes[i, 1].set_ylabel("Histogram")
+
+        axes[-1, 0].set_xlabel("Score(Model Confidence)")
+        axes[-1, 1].set_xlabel("ECE")
+        axes[-1, 1].legend()
 
         axes[0, 0].text(-4, 0.5, "N=100", verticalalignment='center', rotation=90)
         axes[1, 0].text(-4, 0.5, "N=1000", verticalalignment='center', rotation=90)
         axes[2, 0].text(-4, 0.5, "Label all data", verticalalignment='center', rotation=90)
 
-        fig.set_size_inches(COLUMN_WIDTH, 3.5)
+        fig.set_size_inches(COLUMN_WIDTH, 3.0)
         fig.subplots_adjust(bottom=0.05, wspace=0.05)
         fig.tight_layout()
 

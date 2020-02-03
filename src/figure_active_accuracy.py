@@ -47,6 +47,7 @@ DEFAULT_RC = {
     'ytick.labelsize': 4,
 }
 
+
 DEFAULT_PLOT_KWARGS = {
     'linewidth': 1
 }
@@ -119,7 +120,7 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
     ax.set_ylim(0, 1.0)
     xmin, xmax = ax.get_xlim()
     step = ((xmax - xmin) / 4.0001)
-    ax.xaxis.set_maj or_formatter(ticker.PercentFormatter(xmax=1))
+    ax.xaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
     ax.xaxis.set_ticks(np.arange(xmin, xmax + 0.001, step))
     ax.yaxis.set_ticks(np.arange(0, 1.01, 0.20))
     ax.tick_params(pad=0.25, length=1.5)
@@ -154,10 +155,10 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                 axes[idx].tick_params(left=False)
             idx += 1
 
-        axes[-1].legend()
         if topk == 1:
             axes[0].set_ylabel("MRR, top1")
         else:
+            axes[-1].legend()
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.8)
@@ -204,7 +205,6 @@ def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
         fig.tight_layout()
         fig.set_size_inches(COLUMN_WIDTH * 0.9, 2.0)
         fig.subplots_adjust(wspace=0.20)
-
 
     figname = '../figures/informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)

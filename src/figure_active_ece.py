@@ -144,10 +144,10 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                 axes[idx].tick_params(left=False)
             idx += 1
 
-        axes[-1].legend()
         if topk == 1:
             axes[0].set_ylabel("MRR, top1")
         else:
+            axes[-1].legend()
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.8)

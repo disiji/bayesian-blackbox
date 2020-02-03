@@ -1,0 +1,123 @@
+import argparse
+from typing import Dict, Any, List
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.ticker import PercentFormatter
+
+DATASET_NAMES = {
+    'cifar100': 'CIFAR-100',
+    'imagenet': 'ImageNet',
+    'svhn': 'SVHN',
+    '20newsgroup': '20 Newsgroups',
+    'dbpedia': 'DBpedia',
+}
+DEFAULT_RC = {
+    'lines.markersize': 2,
+    'font.size': 6,
+    'font.family': 'serif',
+    'font.serif': ['Times'],
+    # 'text.usetex': True,
+    'axes.titlesize': 6,
+    'axes.labelsize': 5,
+    'legend.fontsize': 5,
+    'legend.loc': 'upper right',
+    'figure.titlesize': 6,
+    'xtick.labelsize': 4,
+    'ytick.labelsize': 4,
+}
+DEFAULT_PLOT_KWARGS = {
+    'linewidth': 1,
+    'linestyle': "-",
+}
+PRECOMPUTED_GROUND_TRUTH_ECE = {
+    'cifar100': 0.09869599923480106,
+    'imagenet': 0.05007696763512674,
+    'svhn': 0.01095047338003833,
+    '20newsgroup': 0.09242892818137771,
+    'dbpedia': 0.002903918643656106,
+}
+num_bins = 10
+TEXT_WIDTH = 6.299213  # Inches
+
+DATAPATH = '../output/bayesian_reliability_comparison/online_weights/'
+
+
+def plot_reliability_comparison(ax: mpl.axes.Axes,
+                                N_list: List[int],
+                                bayesian_ece: np.ndarray,
+                                frequentist_ece: np.ndarray,
+                                ece_true: float,
+                                plot_kwargs: Dict[str, Any] = {}) -> mpl.axes.Axes:
+    """
+    Plot comparison of calibration estimation error obtained with the Bayesian or frequentist method.
+    :param ax:
+    :param N_list: List[int]
+    :param bayesian_ece: (len(N_list), ) as type float.
+            Estimation of ECE obtained with the Bayesian method.
+    :param frequentist_ece: (len(N_list), ) as type float.
+            Estimation of ECE obtained with the frequentist method.
+    :param ece_true: float.
+            Ground truth ECE
+    :param plot_kwargs: dict.
+        Keyword arguments passed to the plot.
+    :return: ax: the generated matplotlib ax
+    """
+    _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
+    _plot_kwargs.update(plot_kwargs)
+    ax.plot(N_list, (bayesian_ece - ece_true) / ece_true * 100, '-*', **_plot_kwargs, label='Bayesian', color='red')
+    ax.plot(N_list, (frequentist_ece - ece_true) / ece_true * 100, '-o', **_plot_kwargs, label='Frequentist',
+            color='blue')
+    ax.set_xscale('log')
+    ax.set_xlabel('#queries', labelpad=0.2)
+    ax.xaxis.set_ticks(N_list)
+    ax.set_ylim(ymin=0)
+    ax.yaxis.set_major_formatter(PercentFormatter())
+    ax.tick_params(pad=0.25, length=1.5)
+    return ax
+
+
+def main(args: argparse.Namespace) -> None:
+    with mpl.rc_context(rc=DEFAULT_RC):
+        fig, axes = plt.subplots(ncols=len(DATASET_NAMES), dpi=300)
+        idx = 0
+
+        for dataset in DATASET_NAMES:
+            # load result files
+            df = pd.read_csv(DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (dataset, args.pseudocount),
+                             header=0)
+            N_list = df['# N']
+            bayesian_ece = df[" bayesian_ece"]
+            frequentist_ece = df[" frequentist_ece"]
+
+            # datafile = datafile_dict[dataset]
+            # categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
+            # ground_truth_model = SumOfBetaEce(num_bins=10, pseudocount=args.pseudocount)
+            # ground_truth_model.update_batch(confidences, observations)
+            # ece_true = ground_truth_model.frequentist_eval  # if we use Bayesian baseline
+            ece_true = PRECOMPUTED_GROUND_TRUTH_ECE[dataset]
+
+            plot_kwargs = {}
+            axes[idx] = plot_reliability_comparison(axes[idx], N_list, bayesian_ece, frequentist_ece, ece_true,
+                                                    plot_kwargs=plot_kwargs)
+            axes[idx].set_title(DATASET_NAMES[dataset])
+            idx += 1
+
+        axes[-1].legend()
+        axes[0].set_ylabel('ECE estimation error', labelpad=0.2)
+        fig.tight_layout()
+        fig.set_size_inches(TEXT_WIDTH, 1.0)
+        fig.subplots_adjust(bottom=0.2, wspace=0.2)
+
+    fig.savefig('../figures/reliability_comparison_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight',
+                pad_inches=0)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-pseudocount', type=int, default=1, help='Takes value from 2, 5, 10, and maybe 1.')
+    args, _ = parser.parse_known_args()
+
+    main(args)

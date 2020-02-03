@@ -28,8 +28,8 @@ DEFAULT_RC = {
     'legend.fontsize': 5,
     'legend.loc': 'lower right',
     'figure.titlesize': 6,
-    'xtick.labelsize': 3,
-    'ytick.labelsize': 3,
+    'xtick.labelsize': 4,
+    'ytick.labelsize': 4,
 }
 DEFAULT_PLOT_KWARGS = {
     'linewidth': 1,
