@@ -136,6 +136,9 @@ python figure1.py
 # plot scatter plots of accuracy v.s. ece
 pythhon figure_scatter_accuracy_ece.py
 
+# plot ECE estimation error comparison
+python figure_reliability_comparison.py
+
 # plot comparison figures
 python figure_active_accuracy.py -pseudocount 2 &
 python figure_active_accuracy.py -pseudocount 10 &

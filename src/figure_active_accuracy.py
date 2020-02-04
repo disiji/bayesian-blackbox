@@ -30,7 +30,7 @@ COLOR = {'non-active_no_prior': 'non-active',
 METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
                     #                         'non-active_uniform': 'non-active_uniform',
                     #                         'non-active_informed': 'non-active_informed',
-                    'ts_uniform': 'TS (uniform)',
+                    'ts_uniform': 'TS (non-informative)',
                     'ts_informed': 'TS (informative)'
                     }
 DEFAULT_RC = {

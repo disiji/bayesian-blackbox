@@ -12,7 +12,7 @@ RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/
 METHOD_NAME_DICT = {'random_no_prior': 'Non-active',
                     #                         'random_uniform': 'non-active_uniform',
                     #                         'random_informed': 'non-active_informed',
-                    'active': 'TS (uniform)',
+                    'active': 'TS (non-informative)',
                     'active_informed': 'TS (informative)'}
 DEFAULT_RC = {
     'lines.markersize': 2,
