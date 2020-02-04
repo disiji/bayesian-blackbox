@@ -21,18 +21,22 @@ EVAL_METRIC_NAMES = {
     'avg_num_agreement': '#agreements',
     'mrr': 'MRR'
 }
-COLOR = {'non-active_no_prior': 'non-active',
-         'non-active_uniform': 'non-active_uniform',
-         'non-active_informed': 'non-active_informed',
-         'ts_uniform': 'ts(uniform)',
-         'ts_informed': 'ts(informative)'
+COLOR = {'non-active_no_prior': '#1f77b4',
+         'ts_uniform': '#ff7f0e',
+         'ts_informed': 'green'
          }
 METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
                     #                         'non-active_uniform': 'non-active_uniform',
                     #                         'non-active_informed': 'non-active_informed',
-                    'ts_uniform': 'TS (non-informative)',
+                    'ts_uniform': 'TS',
                     'ts_informed': 'TS (informative)'
                     }
+TOPK_METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
+                         #                         'non-active_uniform': 'non-active_uniform',
+                         #                         'non-active_informed': 'non-active_informed',
+                         'ts_uniform': 'MP-TS',
+                         'ts_informed': 'MP-TS (informative)'
+                         }
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -47,9 +51,8 @@ DEFAULT_RC = {
     'ytick.labelsize': 4,
 }
 
-
 DEFAULT_PLOT_KWARGS = {
-    'linewidth': 1
+    'linewidth': 1.2
 }
 
 COLUMN_WIDTH = 3.25  # Inches
@@ -69,6 +72,7 @@ from data_utils import datasize_dict
 
 def plot_topk_accuracy(ax: mpl.axes.Axes,
                        experiment_name: str,
+                       topk: int,
                        eval_metric: str,
                        pool_size: int,
                        threshold: float,
@@ -97,16 +101,24 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
 
     if plot_informed:
         benchmark = 'ts_informed'
-        method_list = ['non-active_no_prior', 'ts_uniform', 'ts_informed']
+        method_list = {'ts_informed': 'TS (informative)',
+                       'ts_uniform': 'TS (non-informative)'}
     else:
         benchmark = 'ts_uniform'
-        method_list = ['non-active_no_prior', 'ts_uniform']
+        method_list = {'non-active_no_prior', 'ts_uniform'}
 
     for method in method_list:
         metric_eval = np.load(
             RESULTS_DIR + experiment_name + ('%s_%s.npy' % (eval_metric, method))).mean(axis=0)
         x = np.arange(len(metric_eval)) * LOG_FREQ / pool_size
-        ax.plot(x, metric_eval, label=METHOD_NAME_DICT[method], **_plot_kwargs)
+        if topk == 1:
+            if plot_informed:
+                label = method_list[method]
+            else:
+                label = METHOD_NAME_DICT[method]
+        else:
+            label = TOPK_METHOD_NAME_DICT[method]
+        ax.plot(x, metric_eval, label=label, color=COLOR[method], **_plot_kwargs)
 
         if method == benchmark:
             if method == benchmark:
@@ -133,7 +145,6 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
         fig, axes = plt.subplots(ncols=len(TOPK_DICT), dpi=300, sharey=True)
         idx = 0
         for dataset in TOPK_DICT:
-            print(dataset)
             if top1:
                 topk = 1
             else:
@@ -143,6 +154,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
             plot_kwargs = {}
             plot_topk_accuracy(axes[idx],
                                experiment_name,
+                               topk,
                                eval_metric,
                                datasize_dict[dataset],
                                threshold=threshold,
@@ -155,10 +167,10 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                 axes[idx].tick_params(left=False)
             idx += 1
 
+        axes[-1].legend()
         if topk == 1:
             axes[0].set_ylabel("MRR, top1")
         else:
-            axes[-1].legend()
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.8)
@@ -173,37 +185,29 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
 
 def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
     with mpl.rc_context(rc=DEFAULT_RC):
-        fig, axes = plt.subplots(ncols=2, nrows=2, dpi=300, sharey=True)
+        # fig, axes = plt.subplots(ncols=2, nrows=2, dpi=300, sharey=True)
+        fig, axes = plt.subplots(ncols=2, nrows=1, dpi=300, sharey=True)
         for idx, dataset in enumerate(['imagenet', 'svhn']):
             plot_kwargs = {}
 
             experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f/' % \
                               (dataset, METRIC, MODE, 1, RUNS, pseudocount)
-            plot_topk_accuracy(axes[0, idx],
+            plot_topk_accuracy(axes[idx],
                                experiment_name,
+                               1,
                                eval_metric,
                                datasize_dict[dataset],
                                threshold=threshold,
                                plot_kwargs=plot_kwargs,
                                plot_informed=True)
-            experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f/' % \
-                              (dataset, METRIC, MODE, TOPK_DICT[dataset], RUNS, pseudocount)
-            plot_topk_accuracy(axes[1, idx],
-                               experiment_name,
-                               eval_metric,
-                               datasize_dict[dataset],
-                               threshold=threshold,
-                               plot_kwargs=plot_kwargs,
-                               plot_informed=True)
-        axes[1, 1].legend()
-        axes[0, 0].set_ylabel("MRR, top1")
-        axes[1, 0].set_ylabel("MRR, topK")
-        axes[1, 0].set_xlabel("#queries")
-        axes[1, 1].set_xlabel("#queries")
-        axes[0, 0].set_title(DATASET_NAMES['imagenet'])
-        axes[0, 1].set_title(DATASET_NAMES['svhn'])
+        axes[1].legend()
+        axes[0].set_ylabel("MRR, top1")
+        axes[0].set_xlabel("#queries")
+        axes[1].set_xlabel("#queries")
+        axes[0].set_title(DATASET_NAMES['imagenet'])
+        axes[1].set_title(DATASET_NAMES['svhn'])
         fig.tight_layout()
-        fig.set_size_inches(COLUMN_WIDTH * 0.9, 2.0)
+        fig.set_size_inches(COLUMN_WIDTH * 0.9, 1.0)
         fig.subplots_adjust(wspace=0.20)
 
     figname = '../figures/informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)

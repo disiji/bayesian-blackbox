@@ -68,7 +68,7 @@ def plot_ece_samples(ax: mpl.axes.Axes,
     _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
     _plot_kwargs.update(plot_kwargs)
     # ax.hist(samples_prior, color='blue', label='prior', **_plot_kwargs)
-    ax.hist(samples_posterior, color='red', label='Bayesian', **_plot_kwargs)
+    ax.hist(samples_posterior, color='red', label='Bayesian', alpha=0.7, **_plot_kwargs)
     ax.axvline(x=frequentist_estimation, label='Frequentist', color='blue', **_plot_kwargs)
     ax.axvline(x=ground_truth_ece, label='Ground truth', color='black', **_plot_kwargs)
     ax.set_xlim(0, 0.3)

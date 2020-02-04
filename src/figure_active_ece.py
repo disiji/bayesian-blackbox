@@ -23,14 +23,11 @@ EVAL_METRIC_NAMES = {
     'avg_num_agreement': '#agreements',
     'mrr': 'MRR'
 }
-COLOR = {'non-active_no_prior': 'non-active',
-         'non-active_uniform': 'non-active_uniform',
-         'non-active_informed': 'non-active_informed',
-         'ts_uniform': 'ts(uniform)',
-         'ts_informed': 'ts(informative)'
-         }
 METHOD_NAME_DICT = {'non-active': 'Non-active',
                     'ts': 'TS'}
+TOPK_METHOD_NAME_DICT = {'non-active': 'Non-active',
+                         'ts': 'MP-TS'}
+
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -45,7 +42,7 @@ DEFAULT_RC = {
     'ytick.labelsize': 4,
 }
 DEFAULT_PLOT_KWARGS = {
-    'linewidth': 1
+    'linewidth': 1.2
 }
 
 COLUMN_WIDTH = 3.25  # Inches
@@ -65,6 +62,7 @@ from data_utils import datasize_dict
 
 def plot_topk_ece(ax: mpl.axes.Axes,
                   experiment_name: str,
+                  topk: int,
                   eval_metric: str,
                   pool_size: int,
                   threshold: float,
@@ -96,7 +94,16 @@ def plot_topk_ece(ax: mpl.axes.Axes,
         metric_eval = np.load(
             RESULTS_DIR + experiment_name + ('%s_%s.npy' % (eval_metric, method))).mean(axis=0)
         x = np.arange(len(metric_eval)) * LOG_FREQ / pool_size
-        ax.plot(x, metric_eval, label=METHOD_NAME_DICT[method], **_plot_kwargs)
+
+        if topk == 1:
+            label = METHOD_NAME_DICT[method]
+        else:
+            label = TOPK_METHOD_NAME_DICT[method]
+        if method == 'non-active':
+            linestyle = "-"
+        else:
+            linestyle = '-'
+        ax.plot(x, metric_eval, linestyle, label=label, **_plot_kwargs)
 
         if method == benchmark:
             if max(metric_eval) > threshold:
@@ -132,6 +139,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
             plot_kwargs = {}
             plot_topk_ece(axes[idx],
                           experiment_name,
+                          topk,
                           eval_metric,
                           int(datasize_dict[dataset] * (1 - HOLDOUT_RATIO)),
                           threshold=threshold,
@@ -144,10 +152,10 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                 axes[idx].tick_params(left=False)
             idx += 1
 
+        axes[-1].legend()
         if topk == 1:
             axes[0].set_ylabel("MRR, top1")
         else:
-            axes[-1].legend()
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.8)
