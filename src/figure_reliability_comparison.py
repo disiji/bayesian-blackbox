@@ -49,8 +49,11 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
                                 N_list: List[int],
                                 bayesian_ece: np.ndarray,
                                 frequentist_ece: np.ndarray,
+                                bayesian_ece_std: np.ndarray,
+                                frequentist_ece_std: np.ndarray,
                                 ece_true: float,
-                                plot_kwargs: Dict[str, Any] = {}) -> mpl.axes.Axes:
+                                plot_kwargs: Dict[str, Any] = {},
+                                plot_errorbar: bool = False) -> mpl.axes.Axes:
     """
     Plot comparison of calibration estimation error obtained with the Bayesian or frequentist method.
     :param ax:
@@ -59,6 +62,10 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
             Estimation of ECE obtained with the Bayesian method.
     :param frequentist_ece: (len(N_list), ) as type float.
             Estimation of ECE obtained with the frequentist method.
+    :param bayesian_ece_std: (len(N_list), ) as type float.
+            Standard deviation of estimation of ECE obtained with the Bayesian method.
+    :param frequentist_ece_std: (len(N_list), ) as type float.
+            Standard deviation of estimation of ECE obtained with the frequentist method.
     :param ece_true: float.
             Ground truth ECE
     :param plot_kwargs: dict.
@@ -67,9 +74,19 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
     """
     _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
     _plot_kwargs.update(plot_kwargs)
-    ax.plot(N_list, (bayesian_ece - ece_true) / ece_true * 100, '-*', **_plot_kwargs, label='Bayesian', color='red')
-    ax.plot(N_list, (frequentist_ece - ece_true) / ece_true * 100, '-o', **_plot_kwargs, label='Frequentist',
-            color='blue')
+    if plot_errorbar:
+        # todo: debug
+        ax.errorbar(N_list, (bayesian_ece - ece_true) / ece_true * 100, bayesian_ece_std / ece_true * 100,
+                    '-*', **_plot_kwargs, label='Bayesian', color='red')
+        ax.errorbar(N_list, (frequentist_ece - ece_true) / ece_true * 100, frequentist_ece_std / ece_true * 100,
+                    '-o', **_plot_kwargs, label='Frequentist',
+                    color='blue')
+    else:
+        ax.plot(N_list, (bayesian_ece - ece_true) / ece_true * 100,
+                '-*', **_plot_kwargs, label='Bayesian', color='red')
+        ax.plot(N_list, (frequentist_ece - ece_true) / ece_true * 100,
+                '-o', **_plot_kwargs, label='Frequentist',
+                color='blue')
     ax.set_xscale('log')
     ax.set_xlabel('#queries', labelpad=0.2)
     ax.xaxis.set_ticks(N_list)
@@ -86,11 +103,18 @@ def main(args: argparse.Namespace) -> None:
 
         for dataset in DATASET_NAMES:
             # load result files
-            df = pd.read_csv(DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (dataset, args.pseudocount),
-                             header=0)
-            N_list = df['# N']
-            bayesian_ece = df[" bayesian_ece"]
-            frequentist_ece = df[" frequentist_ece"]
+            df_mean = pd.read_csv(
+                DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (dataset, args.pseudocount),
+                header=0)
+            N_list = df_mean['# N']
+            bayesian_ece = df_mean[" bayesian_ece"]
+            frequentist_ece = df_mean[" frequentist_ece"]
+
+            df_std = pd.read_csv(
+                DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d_std.csv' % (dataset, args.pseudocount),
+                header=0)
+            bayesian_ece_std = df_std[" bayesian_ece"]
+            frequentist_ece_std = df_std[" frequentist_ece"]
 
             # datafile = datafile_dict[dataset]
             # categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
@@ -100,7 +124,13 @@ def main(args: argparse.Namespace) -> None:
             ece_true = PRECOMPUTED_GROUND_TRUTH_ECE[dataset]
 
             plot_kwargs = {}
-            axes[idx] = plot_reliability_comparison(axes[idx], N_list, bayesian_ece, frequentist_ece, ece_true,
+            axes[idx] = plot_reliability_comparison(axes[idx],
+                                                    N_list,
+                                                    bayesian_ece,
+                                                    frequentist_ece,
+                                                    bayesian_ece_std,
+                                                    frequentist_ece_std,
+                                                    ece_true,
                                                     plot_kwargs=plot_kwargs)
             axes[idx].set_title(DATASET_NAMES[dataset])
             idx += 1

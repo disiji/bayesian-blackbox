@@ -26,7 +26,7 @@ def main(args) -> None:
         ground_truth_model = SumOfBetaEce(num_bins=args.num_bins, pseudocount=1e-3)
     ground_truth_model.update_batch(confidences, observations)
 
-    results = np.zeros((len(N_list), 5))
+    results = np.zeros((args.num_runs, len(N_list), 5))
 
     for run_id in range(args.num_runs):
 
@@ -40,11 +40,14 @@ def main(args) -> None:
             tmp = 0 if i == 0 else N_list[i - 1]
             model.update_batch(confidences[tmp: N_list[i]], observations[tmp: N_list[i]])
 
-            results[i, 0] += N_list[i]
-            results[i, 1] += model.eval
-            results[i, 2] += model.frequentist_eval
-            results[i, 3] += model.calibration_estimation_error(ground_truth_model, args.weight_type)
-            results[i, 4] += model.frequentist_calibration_estimation_error(ground_truth_model, args.weight_type)
+            results[run_id, i, 0] = N_list[i]
+            results[run_id, i, 1] = model.eval
+            results[run_id, i, 2] = model.frequentist_eval
+            results[run_id, i, 3] = model.calibration_estimation_error(ground_truth_model, args.weight_type)
+            results[run_id, i, 4] = model.frequentist_calibration_estimation_error(ground_truth_model, args.weight_type)
+
+    results_mean = np.mean(results, axis=0)
+    results_variance = np.std(results, axis=0)
 
     OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
 
@@ -56,13 +59,17 @@ def main(args) -> None:
         os.mkdir(OUTPUT_DIR)
 
     if args.ground_truth_type == 'frequentist':
-        filename = OUTPUT_DIR + "frequentist_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
+        filename_mean = OUTPUT_DIR + "frequentist_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
+        filename_std = OUTPUT_DIR + "frequentist_ground_truth_%s_pseudocount%d_std.csv" % (
+        args.dataset, args.pseudocount)
     else:
-        filename = OUTPUT_DIR + "bayesian_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
+        filename_mean = OUTPUT_DIR + "bayesian_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
+        filename_std = OUTPUT_DIR + "bayesian_ground_truth_%s_pseudocount%d_std.csv" % (
+        args.dataset, args.pseudocount)
 
-    results /= args.num_runs
     header = 'N, bayesian_ece, frequentist_ece, bayesian_estimation_error, frequentist_estimation_error'
-    np.savetxt(filename, results, delimiter=',', header=header)
+    np.savetxt(filename_mean, results_mean, delimiter=',', header=header)
+    np.savetxt(filename_std, results_variance, delimiter=',', header=header)
 
 
 if __name__ == "__main__":
