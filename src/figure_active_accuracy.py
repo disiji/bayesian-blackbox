@@ -173,7 +173,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
         else:
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
-        fig.set_size_inches(TEXT_WIDTH, 0.8)
+        fig.set_size_inches(TEXT_WIDTH, 0.6)
         fig.subplots_adjust(bottom=0.05, wspace=0.20)
 
     if top1:
@@ -207,7 +207,7 @@ def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
         axes[0].set_title(DATASET_NAMES['imagenet'])
         axes[1].set_title(DATASET_NAMES['svhn'])
         fig.tight_layout()
-        fig.set_size_inches(COLUMN_WIDTH * 0.9, 1.0)
+        fig.set_size_inches(COLUMN_WIDTH * 0.8 , 0.6)
         fig.subplots_adjust(wspace=0.20)
 
     figname = '../figures/informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)

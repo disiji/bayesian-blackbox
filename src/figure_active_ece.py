@@ -158,7 +158,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
         else:
             axes[0].set_ylabel("MRR, topK")
         fig.tight_layout()
-        fig.set_size_inches(TEXT_WIDTH, 0.8)
+        fig.set_size_inches(TEXT_WIDTH, 0.6)
         fig.subplots_adjust(bottom=0.05, wspace=0.20)
 
     if top1:

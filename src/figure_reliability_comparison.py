@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import PercentFormatter
-import seaborn as sns
 
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',
@@ -44,7 +43,7 @@ num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
 
 DATAPATH = '../output/bayesian_reliability_comparison/online_weights/'
-ylims = [0.3, 1.0, 1.5, .16, 2.0]
+ylims = [30, 100, 150, 16, 200]
 
 
 def plot_reliability_comparison(ax: mpl.axes.Axes,
