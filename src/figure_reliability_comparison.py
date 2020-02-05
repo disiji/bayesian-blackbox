@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import PercentFormatter
+import seaborn as sns
 
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',
@@ -43,6 +44,7 @@ num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
 
 DATAPATH = '../output/bayesian_reliability_comparison/online_weights/'
+ylims = [0.3, 1.0, 1.5, .16, 2.0]
 
 
 def plot_reliability_comparison(ax: mpl.axes.Axes,
@@ -52,6 +54,7 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
                                 bayesian_ece_std: np.ndarray,
                                 frequentist_ece_std: np.ndarray,
                                 ece_true: float,
+                                ylim: float,
                                 plot_kwargs: Dict[str, Any] = {},
                                 plot_errorbar: bool = False) -> mpl.axes.Axes:
     """
@@ -77,28 +80,29 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
     if plot_errorbar:
         # todo: debug
         ax.errorbar(N_list, (bayesian_ece - ece_true) / ece_true * 100, bayesian_ece_std / ece_true * 100,
-                    '-*', **_plot_kwargs, label='Bayesian', color='red')
+                    '-*', **_plot_kwargs, label='Bayesian', color='tab:red')
         ax.errorbar(N_list, (frequentist_ece - ece_true) / ece_true * 100, frequentist_ece_std / ece_true * 100,
                     '-o', **_plot_kwargs, label='Frequentist',
-                    color='blue')
+                    color='tab:blue')
     else:
         ax.plot(N_list, (bayesian_ece - ece_true) / ece_true * 100,
-                '-*', **_plot_kwargs, label='Bayesian', color='red')
+                '-*', **_plot_kwargs, label='Bayesian', color='tab:red')
         ax.plot(N_list, (frequentist_ece - ece_true) / ece_true * 100,
                 '-o', **_plot_kwargs, label='Frequentist',
-                color='blue')
+                color='tab:blue')
     ax.set_xscale('log')
     ax.set_xlabel('#queries', labelpad=0.2)
     ax.xaxis.set_ticks(N_list)
-    ax.set_ylim(ymin=0)
-    ax.yaxis.set_major_formatter(PercentFormatter())
+    ax.set_ylim(ymin=0, ymax=ylim)
+    ax.set_yticks((0, ylim/2, ylim))
+    ax.yaxis.set_major_formatter(PercentFormatter(decimals=0))
     ax.tick_params(pad=0.25, length=1.5)
     return ax
 
 
 def main(args: argparse.Namespace) -> None:
     with mpl.rc_context(rc=DEFAULT_RC):
-        fig, axes = plt.subplots(ncols=len(DATASET_NAMES), dpi=300)
+        fig, axes = plt.subplots(figsize=(TEXT_WIDTH, 1), ncols=len(DATASET_NAMES), dpi=300)
         idx = 0
 
         for dataset in DATASET_NAMES:
@@ -131,6 +135,7 @@ def main(args: argparse.Namespace) -> None:
                                                     bayesian_ece_std,
                                                     frequentist_ece_std,
                                                     ece_true,
+                                                    ylims[idx],
                                                     plot_kwargs=plot_kwargs)
             axes[idx].set_title(DATASET_NAMES[dataset])
             idx += 1
@@ -138,7 +143,6 @@ def main(args: argparse.Namespace) -> None:
         axes[-1].legend()
         axes[0].set_ylabel('ECE estimation error', labelpad=0.2)
         fig.tight_layout()
-        fig.set_size_inches(TEXT_WIDTH, 1.0)
         fig.subplots_adjust(bottom=0.2, wspace=0.2)
 
     fig.savefig('../figures/reliability_comparison_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight',
