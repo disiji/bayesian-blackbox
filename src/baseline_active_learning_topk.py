@@ -46,7 +46,6 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
     if not (args.output / experiment_name).is_dir():
         (args.output / experiment_name).mkdir()
-    bayesian_ucb
     sampled_categories_dict = {
         'epsilon_greedy': np.empty((RUNS, num_samples), dtype=int),
         'bayesian_ucb': np.empty((RUNS, num_samples), dtype=int),
