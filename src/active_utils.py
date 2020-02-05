@@ -1,10 +1,12 @@
-import numpy as np
-import pandas as pd
 import random
 import warnings
 from collections import deque
-from models import BetaBernoulli, ClasswiseEce
 from typing import List
+
+import numpy as np
+import pandas as pd
+
+from models import BetaBernoulli, ClasswiseEce
 
 
 def eval_ece(confidences: List[float], observations: List[bool], num_bins=10):
@@ -108,7 +110,7 @@ def get_ground_truth(categories: List[int], observations: List[bool], confidence
 
 def get_bayesian_ground_truth(categories: List[int], observations: List[bool], confidences: List[float],
                               num_classes: int,
-                              metric: str, mode: str, topk: int = 1, pseudocount:int=1, prior=None) -> np.ndarray:
+                              metric: str, mode: str, topk: int = 1, pseudocount: int = 1, prior=None) -> np.ndarray:
     """
     Compute ground truth given metric and mode with all data points.
     :param categories:
@@ -210,10 +212,11 @@ def top_two_thompson_sampling(deques: List[deque],
 def epsilon_greedy(deques: List[deque],
                    model: BetaBernoulli,
                    mode: str,
+                   topk: int = 1,
                    epsilon: float = 0.1,
                    **kwargs) -> int:
     if random.random() < epsilon:
-        return random_sampling(deques)
+        return random_sampling(deques, topk)
     else:
         samples = model.eval
         if mode == 'max':
@@ -221,15 +224,29 @@ def epsilon_greedy(deques: List[deque],
         elif mode == 'min':
             ranked = np.argsort(samples)
 
-        for j in range(len(deques)):
-            category = ranked[j]
-            if len(deques[category]) != 0:
-                return category
+        if topk == 1:
+            for j in range(len(deques)):
+                category = ranked[j]
+                if len(deques[category]) != 0:
+                    return category
+        else:
+            categories_list = []
+            candidates = set([i for i in range(len(deques)) if len(deques[i]) > 0])
+            # when we go through 'ranked' and len(categories_list) < topk, topk sampling is reduced to top 1
+            if len(candidates) < topk:
+                return epsilon_greedy(deques, model, mode, topk=1)
+            else:
+                for category in ranked:
+                    if category in candidates:
+                        categories_list.append(category)
+                        if len(categories_list) == topk:
+                            return categories_list
 
 
 def bayesian_UCB(deques: List[deque],
                  model: BetaBernoulli,
                  mode: str,
+                 topk: int = 1,
                  ucb_c: int = 1,
                  **kwargs) -> int:
     metric_val = model.eval
@@ -239,10 +256,24 @@ def bayesian_UCB(deques: List[deque],
     elif mode == 'min':
         metric_val -= ucb_c * model.variance
         ranked = np.argsort(metric_val)
-    for j in range(len(deques)):
-        category = ranked[j]
-        if len(deques[category]) != 0:
-            return category
+
+    if topk == 1:
+        for j in range(len(deques)):
+            category = ranked[j]
+            if len(deques[category]) != 0:
+                return category
+    else:
+        categories_list = []
+        candidates = set([i for i in range(len(deques)) if len(deques[i]) > 0])
+        # when we go through 'ranked' and len(categories_list) < topk, topk sampling is reduced to top 1
+        if len(candidates) < topk:
+            return bayesian_UCB(deques, model, mode, topk=1)
+        else:
+            for category in ranked:
+                if category in candidates:
+                    categories_list.append(category)
+                    if len(categories_list) == topk:
+                        return categories_list
 
 
 SAMPLE_CATEGORY = {
