@@ -10,7 +10,7 @@ from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
 from active_learning_topk import mean_reciprocal_rank
-from cifar100meta import superclass_lookup
+from data_utils import cifar100_superclass_lookup
 from data_utils import datafile_dict, cost_matrix_dir_dict
 from models import DirichletMultinomialCost, Model
 
@@ -277,7 +277,7 @@ def main(args: argparse.Namespace) -> None:
 
     # Load the dataset and cost matrix
     if args.superclass:
-        dataset = SuperclassDataset.load_from_text(datafile_dict[args.dataset], superclass_lookup)
+        dataset = SuperclassDataset.load_from_text(datafile_dict[args.dataset], cifar100_superclass_lookup)
     else:
         dataset = Dataset.load_from_text(datafile_dict[args.dataset])
 
@@ -305,10 +305,6 @@ def main(args: argparse.Namespace) -> None:
     cost_string = '\n'.join('%i  %0.4f' % x for x in enumerate(expected_costs))
     logging.info('TopK highest expected cost predicted class: %i', *ground_truth)
     logging.info('Classwise expected costs:\n%s', cost_string)
-
-    # pretty_print(dataset.confusion_prior)
-    # print()
-    # pretty_print(dataset.confusion_probs)
 
     # Run experiments...
     # stores MPE of classwise cost after every LOG_FREQ steps for each run...
@@ -421,16 +417,6 @@ def main(args: argparse.Namespace) -> None:
     axes.plot(x_axis, active_informed_mrr, label='active (informative prior)')
     axes.legend()
     plt.savefig(args.output / f'mrr_curve_top{args.topk}_pseudocount{args.pseudocount}.png')
-
-    # fig, axes = plt.subplots(1, 1)
-    # n_samples = 1000
-    # posterior_samples = model.sample(n_samples)
-    # max_expected_costs = posterior_samples.argmax(axis=1)
-    # hist = np.zeros((dataset.num_classes,))
-    # for i in range(dataset.num_classes):
-    #     hist[i] = (max_expected_costs == i).sum() / n_samples
-    # axes.bar(np.arange(dataset.num_classes), hist)
-    # fig.savefig(args.output / ('posterior_costs_topk_%d.png' % args.topk))
 
 
 if __name__ == '__main__':

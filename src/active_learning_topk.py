@@ -1,31 +1,24 @@
 import argparse
 import ctypes
-import logging
 import pathlib
-import random
-import warnings
-from collections import deque
 from functools import reduce
 from multiprocessing import Array, Lock, Process, JoinableQueue
-from typing import List, Dict, Tuple
+from typing import Dict, Tuple
 
 import matplotlib.pyplot as plt
-import numpy as np
 from tqdm import tqdm
 
-from active_utils import SAMPLE_CATEGORY, _get_confidence_k, get_ground_truth, get_bayesian_ground_truth, eval_ece
 from calibration import CALIBRATION_MODELS
-from data_utils import datafile_dict, num_classes_dict, logits_dict, datasize_dict, prepare_data, train_holdout_split, \
-    DATASET_LIST
-from models import BetaBernoulli, ClasswiseEce
+from data_utils import *
+from models import ClasswiseEce
+from sampling import *
 
 COLUMN_WIDTH = 3.25  # Inches
-TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 DPI = 300
 FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
-RUNS = 100
+RUNS = 10
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 3
@@ -394,7 +387,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     num_samples = len(observations)
 
     UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * args.pseudocount
-    confidence = _get_confidence_k(categories, confidences, num_classes)
+    confidence = get_confidence_k(categories, confidences, num_classes)
     INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * args.pseudocount
 
     experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f' % (

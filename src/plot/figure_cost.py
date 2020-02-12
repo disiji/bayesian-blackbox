@@ -36,7 +36,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-from cifar100meta import *
+from data_utils import *
 
 
 def plot_topk_cost(ax: mpl.axes.Axes,
@@ -188,16 +188,16 @@ def plot_confusion(new_idx):
 
 
 def main():
-    class_idx = {s: i for i, s in enumerate(classes)}
-    superclass_idx = {s: i for i, s in enumerate(superclasses)}
+    class_idx = {s: i for i, s in enumerate(cifar100_classes)}
+    superclass_idx = {s: i for i, s in enumerate(cifar100_superclasses)}
     superclass_lookup = {}
-    for superclass, class_list in reverse_superclass_lookup.items():
+    for superclass, class_list in cifar100_reverse_superclass_lookup.items():
         for _class in class_list:
             superclass_lookup[class_idx[_class]] = superclass_idx[superclass]
 
     new_idx = []
-    for superclass_name in reverse_superclass_lookup:
-        for class_name in reverse_superclass_lookup[superclass_name]:
+    for superclass_name in cifar100_reverse_superclass_lookup:
+        for class_name in cifar100_reverse_superclass_lookup[superclass_name]:
             new_idx.append(class_idx[class_name])
     new_idx = np.array(new_idx)
 

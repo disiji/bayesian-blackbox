@@ -1,15 +1,12 @@
 import argparse
-import logging
 import pathlib
 from multiprocessing import Lock, Process, JoinableQueue
 
-import numpy as np
 from tqdm import tqdm
 
 from active_learning_topk import get_samples_topk, eval, comparison_plot, MpSafeSharedArray
-from active_utils import _get_confidence_k, get_ground_truth, get_bayesian_ground_truth
-from data_utils import datafile_dict, num_classes_dict, logits_dict, prepare_data, train_holdout_split, \
-    DATASET_LIST
+from data_utils import *
+from sampling import *
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
@@ -38,7 +35,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
     num_samples = len(observations)
 
     UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * args.pseudocount
-    confidence = _get_confidence_k(categories, confidences, num_classes)
+    confidence = get_confidence_k(categories, confidences, num_classes)
     INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * args.pseudocount
 
     experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f' % (

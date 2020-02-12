@@ -1,3 +1,7 @@
+"""
+Implementation of various calibration methods from https://github.com/JonathanWenger/pycalib.
+"""
+
 import warnings
 
 import matplotlib.pyplot as plt

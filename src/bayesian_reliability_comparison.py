@@ -13,6 +13,7 @@ num_cores = multiprocessing.cpu_count()
 NUM_BINS = 10
 NUM_RUNS = 100
 N_list = [100, 200, 500, 1000, 2000, 5000, 10000]
+OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
 
 
 def main(args) -> None:
@@ -49,8 +50,6 @@ def main(args) -> None:
     results_mean = np.mean(results, axis=0)
     results_variance = np.std(results, axis=0)
 
-    OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
-
     if args.weight_type == 'online':
         OUTPUT_DIR += "online_weights/"
     try:
@@ -61,11 +60,11 @@ def main(args) -> None:
     if args.ground_truth_type == 'frequentist':
         filename_mean = OUTPUT_DIR + "frequentist_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
         filename_std = OUTPUT_DIR + "frequentist_ground_truth_%s_pseudocount%d_std.csv" % (
-        args.dataset, args.pseudocount)
+            args.dataset, args.pseudocount)
     else:
         filename_mean = OUTPUT_DIR + "bayesian_ground_truth_%s_pseudocount%d.csv" % (args.dataset, args.pseudocount)
         filename_std = OUTPUT_DIR + "bayesian_ground_truth_%s_pseudocount%d_std.csv" % (
-        args.dataset, args.pseudocount)
+            args.dataset, args.pseudocount)
 
     header = 'N, bayesian_ece, frequentist_ece, bayesian_estimation_error, frequentist_estimation_error'
     np.savetxt(filename_mean, results_mean, delimiter=',', header=header)
