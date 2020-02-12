@@ -1,18 +1,8 @@
-from typing import Any, Dict, List
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.ticker import FormatStrFormatter
-
-from data_utils import datafile_dict, num_classes_dict, prepare_data
-from models import BetaBernoulli, ClasswiseEce
-
+######################################CONSTANTS######################################
 DEFAULT_PLOT_KWARGS = {
     'color': 'blue',
     'linewidth': 1
 }
-
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -25,6 +15,22 @@ DEFAULT_RC = {
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
+
+FIGURE_DIR = '../../figures/'
+######################################CONSTANTS######################################
+import sys
+
+sys.path.insert(0, '..')
+
+from typing import Any, Dict, List
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.ticker import FormatStrFormatter
+
+from data_utils import datafile_dict, num_classes_dict, prepare_data
+from models import BetaBernoulli, ClasswiseEce
 
 
 def hstripe(ax: mpl.axes.Axes,
@@ -126,17 +132,19 @@ def plot_figure_1(accuracy: np.ndarray,
     # Plot
     with mpl.rc_context(rc=DEFAULT_RC):
         fig, axes = plt.subplots(ncols=2, figsize=(3, 3), dpi=300, sharey=True)
-        plot_kwargs = {'color': '#1f77b4'}
+        plot_kwargs = {'color': 'tab:blue'}
         hstripe(axes[0], accuracy, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
         axes[0].set_xlim(right=1.0)
         axes[0].set_title('Accuracy')
 
         # axes[1].vlines(0, -1, ece.shape[0] + 1, colors='#777777', linewidth=1, linestyle='dashed')
-        plot_kwargs = {'color': '#ff7f0e'}
+        plot_kwargs = {'color': 'tab:red'}
         hstripe(axes[1], ece, labels=labels, limit=limit, plot_kwargs=plot_kwargs)
         axes[1].set_xlim(left=0)
         axes[1].tick_params(left=False)
         axes[1].set_title('ECE')
+
+        axes[0].text(-0.5, 10, "CIFAR-100 Labels", verticalalignment='center', rotation=90)
 
     return fig, axes
 
@@ -187,8 +195,8 @@ def main():
 
     fig.tight_layout()
     fig.subplots_adjust(bottom=-0.2, wspace=0.35)
-    fig.set_size_inches(COLUMN_WIDTH, 2.2)
-    fig.savefig('../figures/figure1.pdf', bbox_inches="tight", pad_inches=0.05)
+    fig.set_size_inches(COLUMN_WIDTH * 1.3, 2.0)
+    fig.savefig(FIGURE_DIR + 'figure1.pdf', bbox_inches="tight", pad_inches=0.05)
 
 
 if __name__ == "__main__":

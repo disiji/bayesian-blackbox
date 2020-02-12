@@ -1,12 +1,4 @@
-import argparse
-from typing import Dict, Any, List
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-from matplotlib.ticker import PercentFormatter
-
+######################################CONSTANTS######################################
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',
     'imagenet': 'ImageNet',
@@ -42,8 +34,22 @@ PRECOMPUTED_GROUND_TRUTH_ECE = {
 num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
 
-DATAPATH = '../output/bayesian_reliability_comparison/online_weights/'
 ylims = [30, 100, 150, 16, 200]
+FIGURE_DIR = '../../figures/'
+DATAPATH = '/Users/disiji/Dropbox/current/bayesian-blackbox/output/bayesian_reliability_comparison/online_weights/'
+######################################CONSTANTS######################################
+import sys
+
+sys.path.insert(0, '..')
+
+import argparse
+from typing import Dict, Any, List
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+from matplotlib.ticker import PercentFormatter
 
 
 def plot_reliability_comparison(ax: mpl.axes.Axes,
@@ -93,7 +99,7 @@ def plot_reliability_comparison(ax: mpl.axes.Axes,
     ax.set_xlabel('#queries', labelpad=0.2)
     ax.xaxis.set_ticks(N_list)
     ax.set_ylim(ymin=0, ymax=ylim)
-    ax.set_yticks((0, ylim/2, ylim))
+    ax.set_yticks((0, ylim / 2, ylim))
     ax.yaxis.set_major_formatter(PercentFormatter(decimals=0))
     ax.tick_params(pad=0.25, length=1.5)
     return ax
@@ -119,6 +125,7 @@ def main(args: argparse.Namespace) -> None:
             bayesian_ece_std = df_std[" bayesian_ece"]
             frequentist_ece_std = df_std[" frequentist_ece"]
 
+            # uncomment if PRECOMPUTED_GROUND_TRUTH_ECE does not exist to compute ground truth ece.
             # datafile = datafile_dict[dataset]
             # categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
             # ground_truth_model = SumOfBetaEce(num_bins=10, pseudocount=args.pseudocount)
@@ -144,7 +151,7 @@ def main(args: argparse.Namespace) -> None:
         fig.tight_layout()
         fig.subplots_adjust(bottom=0.2, wspace=0.2)
 
-    fig.savefig('../figures/reliability_comparison_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight',
+    fig.savefig(FIGURE_DIR + 'reliability_comparison_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight',
                 pad_inches=0)
 
 

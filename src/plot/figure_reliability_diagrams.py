@@ -1,15 +1,4 @@
-import argparse
-import random
-from typing import Dict, Any
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.stats import beta
-
-from data_utils import datafile_dict, datasize_dict, prepare_data
-from models import SumOfBetaEce
-
+######################################CONSTANTS######################################
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',
     'imagenet': 'ImageNet',
@@ -37,6 +26,24 @@ DEFAULT_PLOT_KWARGS = {
 }
 num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
+
+FIGURE_DIR = '../../figures/'
+######################################CONSTANTS######################################
+import sys
+
+sys.path.insert(0, '..')
+
+import argparse
+import random
+from typing import Dict, Any
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+from scipy.stats import beta
+
+from data_utils import datafile_dict, datasize_dict, prepare_data
+from models import SumOfBetaEce
 
 
 def plot_bayesian_reliability_diagram(ax, ece_model, plot_kwargs: Dict[str, Any] = {}) -> mpl.axes.Axes:
@@ -130,7 +137,7 @@ def main(args: argparse.Namespace):
         fig.set_size_inches(TEXT_WIDTH, 3.5)
         fig.subplots_adjust(bottom=0.2, wspace=0.3)
 
-    fig.savefig('../figures/reliability_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight', pad_inches=0)
+    fig.savefig(FIGURE_DIR + 'reliability_pseudocount%d.pdf' % args.pseudocount, bbox_inches='tight', pad_inches=0)
 
 
 if __name__ == "__main__":

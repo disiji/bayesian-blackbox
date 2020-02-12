@@ -1,12 +1,4 @@
-from typing import Dict, Any
-
-import matplotlib as mpl
-import matplotlib.pyplot as plt
-import numpy as np
-
-from data_utils import datafile_dict, prepare_data, num_classes_dict
-from models import BetaBernoulli, ClasswiseEce
-
+######################################CONSTANTS######################################
 num_samples = 1000
 
 TOPK_DICT = {'cifar100': 10,
@@ -37,7 +29,7 @@ DEFAULT_RC = {
     'axes.labelsize': 6,
     'legend.fontsize': 5,
     'legend.loc': 'lower right',
-    'figure.titlesize': 6,
+    'figure.titlesize': 8,
     'xtick.labelsize': 4,
     'ytick.labelsize': 4,
 }
@@ -49,6 +41,21 @@ DEFAULT_PLOT_KWARGS = {
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
+
+FIGURE_DIR = '../../figures/'
+######################################CONSTANTS######################################
+import sys
+
+sys.path.insert(0, '..')
+
+from typing import Dict, Any
+
+import matplotlib as mpl
+import matplotlib.pyplot as plt
+import numpy as np
+
+from data_utils import datafile_dict, prepare_data, num_classes_dict
+from models import BetaBernoulli, ClasswiseEce
 
 
 def plot_scatter(ax: mpl.axes.Axes,
@@ -93,7 +100,7 @@ def plot_scatter(ax: mpl.axes.Axes,
 
 def main() -> None:
     with mpl.rc_context(rc=DEFAULT_RC):
-        fig, axes = plt.subplots(ncols=len(TOPK_DICT), dpi=300, sharey=False)
+        fig, axes = plt.subplots(ncols=3, nrows=2, dpi=300, sharey=False)
         idx = 0
         for dataset in DATASET_NAMES:
             datafile = datafile_dict[dataset]
@@ -114,16 +121,18 @@ def main() -> None:
             ece_samples = ece_model.sample(num_samples)  # (num_categories, num_samples)
 
             plot_kwargs = {}
-            axes[idx] = plot_scatter(axes[idx], accuracy_samples, ece_samples, limit=TOPK_DICT[dataset],
-                                     plot_kwargs=plot_kwargs)
-            axes[idx].set_title(DATASET_NAMES[dataset])
+            axes[idx // 3, idx % 3] = plot_scatter(axes[idx // 3, idx % 3], accuracy_samples, ece_samples,
+                                                   limit=TOPK_DICT[dataset], plot_kwargs=plot_kwargs)
+            axes[idx // 3, idx % 3].set_title(DATASET_NAMES[dataset])
             idx += 1
 
-    axes[0].set_ylabel('ECE')
-    fig.set_size_inches(TEXT_WIDTH, 1.3)
+    axes[0, 0].set_ylabel('ECE')
+    axes[1, 0].set_ylabel('ECE')
+    fig.set_size_inches(TEXT_WIDTH, 4.0)
+    fig.subplots_adjust(bottom=0.05, wspace=0.2)
+    fig.delaxes(axes.flatten()[5])
+    figname = FIGURE_DIR + 'scatter.pdf'
     fig.tight_layout()
-    fig.subplots_adjust(bottom=0.05, wspace=0.25)
-    figname = '../figures/scatter.pdf'
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 

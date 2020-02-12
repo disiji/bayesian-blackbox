@@ -1,8 +1,7 @@
-###################CONSTANTS
+######################################CONSTANTS######################################
 METRIC = 'accuracy'
 MODE = 'min'
 
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
 RUNS = 100
 LOG_FREQ = 100
 TOPK_DICT = {'cifar100': 10,
@@ -23,19 +22,27 @@ EVAL_METRIC_NAMES = {
 }
 COLOR = {'non-active_no_prior': '#1f77b4',
          'ts_uniform': '#ff7f0e',
-         'ts_informed': 'green'
+         'ts_informed': 'green',
+         'epsilon_greedy_no_prior': 'pink',
+         'bayesian_ucb_no_prior': 'cyan'
+
          }
 METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
                     #                         'non-active_uniform': 'non-active_uniform',
                     #                         'non-active_informed': 'non-active_informed',
                     'ts_uniform': 'TS',
-                    'ts_informed': 'TS (informative)'
+                    'ts_informed': 'TS (informative)',
+                    'epsilon_greedy_no_prior': 'Epsilon greedy',
+                    'bayesian_ucb_no_prior': 'Bayesian UCB',
+
                     }
 TOPK_METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
                          #                         'non-active_uniform': 'non-active_uniform',
                          #                         'non-active_informed': 'non-active_informed',
                          'ts_uniform': 'MP-TS',
-                         'ts_informed': 'MP-TS (informative)'
+                         'ts_informed': 'MP-TS (informative)',
+                         'epsilon_greedy_no_prior': 'Epsilon greedy',
+                         'bayesian_ucb_no_prior': 'Bayesian UCB',
                          }
 DEFAULT_RC = {
     'font.size': 8,
@@ -50,7 +57,6 @@ DEFAULT_RC = {
     'xtick.labelsize': 4,
     'ytick.labelsize': 4,
 }
-
 DEFAULT_PLOT_KWARGS = {
     'linewidth': 1.2
 }
@@ -59,6 +65,11 @@ COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 
+FIGURE_DIR = '../../figures/'
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
+######################################CONSTANTS######################################
+import sys
+sys.path.insert(0, '..')
 import argparse
 from typing import Dict, Any
 
@@ -102,9 +113,10 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
     if plot_informed:
         benchmark = 'ts_informed'
         method_list = {'ts_informed': 'TS (informative)',
-                       'ts_uniform': 'TS (non-informative)'}
+                       'ts_uniform': 'TS (uninformative)', }
     else:
         benchmark = 'ts_uniform'
+        # method_list = {'non-active_no_prior', 'ts_uniform', 'epsilon_greedy_no_prior', 'bayesian_ucb_no_prior'}
         method_list = {'non-active_no_prior', 'ts_uniform'}
 
     for method in method_list:
@@ -169,17 +181,17 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
 
         axes[-1].legend()
         if topk == 1:
-            axes[0].set_ylabel("MRR, top1")
+            axes[0].set_ylabel("MRR, top-1")
         else:
-            axes[0].set_ylabel("MRR, topK")
+            axes[0].set_ylabel("MRR, top-m")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.6)
         fig.subplots_adjust(bottom=0.05, wspace=0.20)
 
     if top1:
-        figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+        figname = FIGURE_DIR + '%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     else:
-        figname = '../figures/%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+        figname = FIGURE_DIR + '%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 
@@ -201,16 +213,16 @@ def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
                                plot_kwargs=plot_kwargs,
                                plot_informed=True)
         axes[1].legend()
-        axes[0].set_ylabel("MRR, top1")
+        axes[0].set_ylabel("MRR, top-1")
         axes[0].set_xlabel("#queries")
         axes[1].set_xlabel("#queries")
         axes[0].set_title(DATASET_NAMES['imagenet'])
         axes[1].set_title(DATASET_NAMES['svhn'])
         fig.tight_layout()
-        fig.set_size_inches(COLUMN_WIDTH * 0.8 , 0.6)
+        fig.set_size_inches(COLUMN_WIDTH * 0.8, 0.6)
         fig.subplots_adjust(wspace=0.20)
 
-    figname = '../figures/informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+    figname = FIGURE_DIR + 'informed_%s_%s_%s_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 

@@ -1,10 +1,7 @@
-###################CONSTANTS
+######################################CONSTANTS######################################
 METRIC = 'calibration_error'
 MODE = 'max'
 HOLDOUT_RATIO = 0.1
-
-#################################
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
 RUNS = 100
 LOG_FREQ = 100
 TOPK_DICT = {'cifar100': 10,
@@ -24,10 +21,19 @@ EVAL_METRIC_NAMES = {
     'mrr': 'MRR'
 }
 METHOD_NAME_DICT = {'non-active': 'Non-active',
+                    # 'epsilon_greedy': 'Epsilon greedy',
+                    # 'bayesian_ucb': 'Bayesian UCB',
                     'ts': 'TS'}
 TOPK_METHOD_NAME_DICT = {'non-active': 'Non-active',
+                         'epsilon_greedy': 'Epsilon greedy',
+                         'bayesian_ucb': 'Bayesian UCB',
                          'ts': 'MP-TS'}
+COLOR = {'non-active': '#1f77b4',
+         'ts': '#ff7f0e',
+         'epsilon_greedy': 'pink',
+         'bayesian_ucb': 'cyan'
 
+         }
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -49,6 +55,12 @@ COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
+FIGURE_DIR = '../../figures/'
+######################################CONSTANTS######################################
+import sys
+
+sys.path.insert(0, '..')
 import argparse
 from typing import Dict, Any
 
@@ -103,7 +115,7 @@ def plot_topk_ece(ax: mpl.axes.Axes,
             linestyle = "-"
         else:
             linestyle = '-'
-        ax.plot(x, metric_eval, linestyle, label=label, **_plot_kwargs)
+        ax.plot(x, metric_eval, linestyle, color=COLOR[method], label=label, **_plot_kwargs)
 
         if method == benchmark:
             if max(metric_eval) > threshold:
@@ -154,17 +166,17 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
 
         axes[-1].legend()
         if topk == 1:
-            axes[0].set_ylabel("MRR, top1")
+            axes[0].set_ylabel("MRR, top-1")
         else:
-            axes[0].set_ylabel("MRR, topK")
+            axes[0].set_ylabel("MRR, top-m")
         fig.tight_layout()
         fig.set_size_inches(TEXT_WIDTH, 0.6)
         fig.subplots_adjust(bottom=0.05, wspace=0.20)
 
     if top1:
-        figname = '../figures/%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+        figname = FIGURE_DIR + '%s_%s_%s_top1_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     else:
-        figname = '../figures/%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
+        figname = FIGURE_DIR + '%s_%s_%s_topk_pseudocount%d.pdf' % (METRIC, MODE, eval_metric, pseudocount)
     fig.savefig(figname, bbox_inches='tight', pad_inches=0)
 
 
