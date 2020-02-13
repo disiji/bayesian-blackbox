@@ -5,7 +5,7 @@ import random
 
 import numpy as np
 
-from data_utils import DATAFILE_LIST, DATASET_LIST, prepare_data
+from data_utils import DATAFILE_LIST, DATASET_LIST, prepare_data, RESULTS_DIR
 from models import SumOfBetaEce
 
 random.seed(2020)
@@ -13,7 +13,8 @@ num_cores = multiprocessing.cpu_count()
 NUM_BINS = 10
 NUM_RUNS = 100
 N_list = [100, 200, 500, 1000, 2000, 5000, 10000]
-OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
+
+OUTPUT_DIR = RESULTS_DIR + "bayesian_reliability_comparison/"
 
 
 def main(args) -> None:

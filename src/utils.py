@@ -15,7 +15,6 @@ from sampling import SAMPLE_CATEGORY
 COLUMN_WIDTH = 3.25  # Inches
 GOLDEN_RATIO = 1.61803398875
 FONT_SIZE = 8
-OUTPUT_DIR = "../output/active_learning_topk"
 
 RUNS = 100
 LOG_FREQ = 100
@@ -37,7 +36,7 @@ def get_samples_topk(args: argparse.Namespace,
                      sample_method: str,
                      prior=None,
                      weight=None,
-                     random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+                     random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     # prepare model, deques, thetas, choices
 
     random.seed(random_seed)

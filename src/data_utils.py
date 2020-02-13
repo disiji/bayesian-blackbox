@@ -12,8 +12,12 @@ logger = logging.getLogger(__name__)
 np.random.seed(0)
 
 ############################################################################
+"""
+Update DATA_DIR, RESULTS_DIR, FIGURE_DIR
+"""
 # INTPUT FILES
 DATA_DIR = '/Users/disiji/Dropbox/current/bayesian-blackbox/data/'
+
 DATAFILE_LIST = {
     'cifar100': DATA_DIR + 'cifar100/cifar100_predictions_dropout.txt',
     'imagenet': DATA_DIR + 'imagenet/resnet152_imagenet_outputs.txt',
@@ -27,6 +31,20 @@ LOGITSFILE_DICT = {
     'imagenet': DATA_DIR + 'imagenet/resnet152_imagenet_logits.txt',
 }
 
+COST_MATRIX_FILE_DICT = {
+    'human': DATA_DIR + 'cost/cifar100_people_full/costs.npy',
+    'superclass': DATA_DIR + 'cost/cifar100_superclass_full/costs.npy'
+}
+COST_INFORMED_PRIOR_FILE = DATA_DIR + 'cost/cifar100_superclass_full/informed_prior.npy'
+
+
+# OUTPUT FILES
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200204/output/'
+FIGURE_DIR = '../../figures/'
+
+############################################################################
+# DATA INFO
+DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
 DATASIZE_DICT = {
     'cifar100': 10000,
     'imagenet': 50000,
@@ -43,25 +61,7 @@ NUM_CLASSES_DICT = {
     'svhn': 10,
     'dbpedia': 14,
 }
-COST_MATRIX_FILE_DICT = {
-    'human': DATA_DIR + 'cost/cifar100_people_full/costs.npy',
-    'superclass': DATA_DIR + 'cost/cifar100_superclass_full/costs.npy'
-}
-COST_INFORMED_PRIOR_FILE = DATA_DIR + 'cost/cifar100_superclass_full/informed_prior.npy'
 
-DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
-
-
-
-############################################################################
-# OUTPUT FILES
-FIGURE_DIR = '../../figures/'
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200204/output/'
-RELIABILITY_COMPARISON_DATAPATH = '/Users/disiji/Dropbox/current/bayesian-blackbox/output/' + \
-                                  'bayesian_reliability_comparison/online_weights/'
-
-
-############################################################################
 # PLOT
 DATASET_NAMES = {
     'cifar100': 'CIFAR-100',

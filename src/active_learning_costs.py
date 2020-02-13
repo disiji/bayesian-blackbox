@@ -11,7 +11,10 @@ from tqdm import tqdm
 
 from active_learning_topk import mean_reciprocal_rank
 from data_utils import CIFAR100_SUPERCLASS_LOOKUP, DATAFILE_LIST, COST_MATRIX_FILE_DICT
+from data_utils import RESULTS_DIR
 from models import DirichletMultinomialCost, Model
+
+OUTPUT_DIR = RESULTS_DIR + 'costs/cifar100'
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +180,7 @@ def max_choice_fn(sample: np.ndarray) -> np.ndarray:
 def select_and_label(dataset: Dataset,
                      model: Model,
                      topk: int,
-                     choice_fn: Callable) -> None:  # IDK what return type should be...
+                     choice_fn: Callable) -> Tuple[np.ndarray, np.ndarray]:
     """
     Selects data points from dataset according to criterion and updates the model.
 
@@ -421,7 +424,7 @@ def main(args: argparse.Namespace) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-dataset', type=str, default='cifar100', help='input dataset')
-    parser.add_argument('-output', type=pathlib.Path, default='../output/costs/cifar100', help='output prefix')
+    parser.add_argument('-output', type=pathlib.Path, default=OUTPUT_DIR, help='output prefix')
     parser.add_argument('-topk', type=int, default=1, help='number of optimal arms to identify')
     parser.add_argument('-s', '--seed', type=int, default=1337, help='random seed')
     parser.add_argument('-type_cost', type=str, default=None, help='human or superclass')

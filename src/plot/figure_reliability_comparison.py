@@ -41,7 +41,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import PercentFormatter
-from data_utils import FIGURE_DIR, RELIABILITY_COMPARISON_DATAPATH, DATASET_NAMES
+from data_utils import FIGURE_DIR, DATASET_NAMES, RESULTS_DIR
+
+RESULTS_DIR = RESULTS_DIR + 'bayesian_reliability_comparison/online_weights/'
 
 
 def plot_reliability_comparison(ax: mpl.axes.Axes,
@@ -105,7 +107,7 @@ def main(args: argparse.Namespace) -> None:
         for dataset in DATASET_NAMES:
             # load result files
             df_mean = pd.read_csv(
-                RELIABILITY_COMPARISON_DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (
+                RESULTS_DIR + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (
                     dataset, args.pseudocount),
                 header=0)
             N_list = df_mean['# N']
@@ -113,7 +115,7 @@ def main(args: argparse.Namespace) -> None:
             frequentist_ece = df_mean[" frequentist_ece"]
 
             df_std = pd.read_csv(
-                RELIABILITY_COMPARISON_DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d_std.csv' % (
+                RESULTS_DIR + 'frequentist_ground_truth_%s_pseudocount%d_std.csv' % (
                     dataset, args.pseudocount),
                 header=0)
             bayesian_ece_std = df_std[" bayesian_ece"]

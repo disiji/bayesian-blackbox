@@ -5,6 +5,8 @@ from tqdm import tqdm
 
 from utils import *
 
+OUTPUT_DIR = RESULTS_DIR + "active_learning_topk"
+
 logger = logging.getLogger(__name__)
 process_lock = Lock()
 
