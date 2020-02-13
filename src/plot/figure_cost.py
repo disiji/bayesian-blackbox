@@ -1,9 +1,4 @@
 ######################################CONSTANTS######################################
-METHOD_NAME_DICT = {'random_no_prior': 'Non-active',
-                    #                         'random_uniform': 'non-active_uniform',
-                    #                         'random_informed': 'non-active_informed',
-                    'active': 'TS (uninformative)',
-                    'active_informed': 'TS (informative)'}
 DEFAULT_RC = {
     'lines.markersize': 2,
     'font.size': 6,
@@ -24,9 +19,11 @@ DEFAULT_PLOT_KWARGS = {
 COLUMN_WIDTH = 3.25  # Inche
 LOG_FREQ = 10
 
-FIGURE_DIR = '../../figures/'
-DATA_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/cost_result_matrices/'
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/costs/cifar100/'
+COST_METHOD_NAME_DICT = {'random_no_prior': 'Non-active',
+                         #                         'random_uniform': 'non-active_uniform',
+                         #                         'random_informed': 'non-active_informed',
+                         'active': 'TS (uninformative)',
+                         'active_informed': 'TS (informative)'}
 ######################################CONSTANTS######################################
 import sys
 
@@ -36,7 +33,10 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
-from data_utils import *
+from data_utils import RESULTS_DIR, COST_MATRIX_FILE_DICT, FIGURE_DIR, \
+    COST_INFORMED_PRIOR_FILE, CIFAR100_CLASSES, CIFAR100_SUPERCLASSES, CIFAR100_REVERSE_SUPERCLASS_LOOKUP
+
+RESULTS_DIR = RESULTS_DIR + 'costs/cifar100/'
 
 
 def plot_topk_cost(ax: mpl.axes.Axes,
@@ -65,11 +65,11 @@ def plot_topk_cost(ax: mpl.axes.Axes,
     _plot_kwargs = DEFAULT_PLOT_KWARGS.copy()
     _plot_kwargs.update(plot_kwargs)
 
-    for method in METHOD_NAME_DICT:
+    for method in COST_METHOD_NAME_DICT:
         metric_eval = np.load(
             RESULTS_DIR + experiment_name + ('/%s_%s_top1_pseudocount1.0.npy' % (method, eval_metric)))
         x = np.arange(len(metric_eval)) * LOG_FREQ / pool_size
-        ax.plot(x, metric_eval, label=METHOD_NAME_DICT[method], **_plot_kwargs)
+        ax.plot(x, metric_eval, label=COST_METHOD_NAME_DICT[method], **_plot_kwargs)
 
     cutoff = len(metric_eval) - 1
     ax.set_xlim(0, cutoff * LOG_FREQ / pool_size)
@@ -91,9 +91,9 @@ def plot_cost_matrix(new_idx):
         _plot_kwargs.update(plot_kwargs)
         fig, axes = plt.subplots(2, 1, sharex=True)
 
-        axes[0].imshow(np.load(DATA_DIR + 'cifar100_people_full/costs.npy')[:, new_idx][new_idx, :].T,
+        axes[0].imshow(np.load(COST_MATRIX_FILE_DICT['human'])[:, new_idx][new_idx, :].T,
                        **_plot_kwargs)
-        axes[1].imshow(np.load(DATA_DIR + 'cifar100_superclass_full/costs.npy')[:, new_idx][new_idx, :].T,
+        axes[1].imshow(np.load(COST_MATRIX_FILE_DICT['superclass'])[:, new_idx][new_idx, :].T,
                        **_plot_kwargs)
 
         axes[0].set_title('Human')
@@ -152,7 +152,7 @@ def plot_confusion(new_idx):
                 np.load(RESULTS_DIR + 'superclass/%s_confusion_log_top1_pseudocount1.0.npy' % method_name)[:, new_idx,
                 :][:, :, new_idx])
             if method_name == 'active_informed':
-                prior = (np.load(DATA_DIR + 'cifar100_superclass_full/informed_prior.npy'))[new_idx, :][:, new_idx]
+                prior = (np.load(COST_INFORMED_PRIOR_FILE))[new_idx, :][:, new_idx]
             else:
                 prior = np.ones((100, 100)) * 1. / 10
 

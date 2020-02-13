@@ -1,11 +1,4 @@
 ######################################CONSTANTS######################################
-DATASET_NAMES = {
-    'cifar100': 'CIFAR-100',
-    'imagenet': 'ImageNet',
-    'svhn': 'SVHN',
-    '20newsgroup': '20 Newsgroups',
-    'dbpedia': 'DBpedia',
-}
 DEFAULT_RC = {
     'lines.markersize': 2,
     'font.size': 6,
@@ -33,30 +26,26 @@ PRECOMPUTED_GROUND_TRUTH_ECE = {
 }
 
 COLUMN_WIDTH = 3.25  # Inches
-TEXT_WIDTH = 6.299213  # Inches
-GOLDEN_RATIO = 1.61803398875
 
 num_bins = 10
 pseudocount = 2
 N_list = [100, 1000, 10000]
 num_samples = 1000
 
-FIGURE_DIR = '../../figures/'
 ######################################CONSTANTS######################################
-import sys
-
-sys.path.insert(0, '..')
 import argparse
 import pathlib
 import random
+import sys
 from typing import Dict, Any, List
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-
-from data_utils import DATAFILE_LIST, prepare_data
 from figure_reliability_diagrams import plot_bayesian_reliability_diagram
+
+sys.path.insert(0, '..')
+from data_utils import DATAFILE_LIST, prepare_data, FIGURE_DIR
 from models import SumOfBetaEce
 
 

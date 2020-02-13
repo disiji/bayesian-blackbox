@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 np.random.seed(0)
 
+############################################################################
+# INTPUT FILES
 DATA_DIR = '/Users/disiji/Dropbox/current/bayesian-blackbox/data/'
 DATAFILE_LIST = {
     'cifar100': DATA_DIR + 'cifar100/cifar100_predictions_dropout.txt',
@@ -45,8 +47,38 @@ COST_MATRIX_FILE_DICT = {
     'human': DATA_DIR + 'cost/cifar100_people_full/costs.npy',
     'superclass': DATA_DIR + 'cost/cifar100_superclass_full/costs.npy'
 }
+COST_INFORMED_PRIOR_FILE = DATA_DIR + 'cost/cifar100_superclass_full/informed_prior.npy'
+
 DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'imagenet2_topimages']
 
+
+
+############################################################################
+# OUTPUT FILES
+FIGURE_DIR = '../../figures/'
+RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200204/output/'
+RELIABILITY_COMPARISON_DATAPATH = '/Users/disiji/Dropbox/current/bayesian-blackbox/output/' + \
+                                  'bayesian_reliability_comparison/online_weights/'
+
+
+############################################################################
+# PLOT
+DATASET_NAMES = {
+    'cifar100': 'CIFAR-100',
+    'imagenet': 'ImageNet',
+    'svhn': 'SVHN',
+    '20newsgroup': '20 Newsgroups',
+    'dbpedia': 'DBpedia',
+}
+TOPK_DICT = {'cifar100': 10,
+             'imagenet': 10,
+             'svhn': 3,
+             '20newsgroup': 3,
+             'dbpedia': 3}
+EVAL_METRIC_NAMES = {
+    'avg_num_agreement': '#agreements',
+    'mrr': 'MRR'
+}
 ############################################################################
 # CIFAR100 meta data needed to map classes to superclasses and vice versa.
 

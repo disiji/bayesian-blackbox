@@ -1,11 +1,4 @@
 ######################################CONSTANTS######################################
-DATASET_NAMES = {
-    'cifar100': 'CIFAR-100',
-    'imagenet': 'ImageNet',
-    'svhn': 'SVHN',
-    '20newsgroup': '20 Newsgroups',
-    'dbpedia': 'DBpedia',
-}
 DEFAULT_RC = {
     'lines.markersize': 2,
     'font.size': 6,
@@ -35,8 +28,6 @@ num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
 
 ylims = [30, 100, 150, 16, 200]
-FIGURE_DIR = '../../figures/'
-DATAPATH = '/Users/disiji/Dropbox/current/bayesian-blackbox/output/bayesian_reliability_comparison/online_weights/'
 ######################################CONSTANTS######################################
 import sys
 
@@ -50,6 +41,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import PercentFormatter
+from data_utils import FIGURE_DIR, RELIABILITY_COMPARISON_DATAPATH, DATASET_NAMES
 
 
 def plot_reliability_comparison(ax: mpl.axes.Axes,
@@ -113,14 +105,16 @@ def main(args: argparse.Namespace) -> None:
         for dataset in DATASET_NAMES:
             # load result files
             df_mean = pd.read_csv(
-                DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (dataset, args.pseudocount),
+                RELIABILITY_COMPARISON_DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d.csv' % (
+                    dataset, args.pseudocount),
                 header=0)
             N_list = df_mean['# N']
             bayesian_ece = df_mean[" bayesian_ece"]
             frequentist_ece = df_mean[" frequentist_ece"]
 
             df_std = pd.read_csv(
-                DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d_std.csv' % (dataset, args.pseudocount),
+                RELIABILITY_COMPARISON_DATAPATH + 'frequentist_ground_truth_%s_pseudocount%d_std.csv' % (
+                    dataset, args.pseudocount),
                 header=0)
             bayesian_ece_std = df_std[" bayesian_ece"]
             frequentist_ece_std = df_std[" frequentist_ece"]

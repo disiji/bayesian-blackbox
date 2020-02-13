@@ -4,22 +4,7 @@ MODE = 'min'
 
 RUNS = 100
 LOG_FREQ = 100
-TOPK_DICT = {'cifar100': 10,
-             'imagenet': 10,
-             'svhn': 3,
-             '20newsgroup': 3,
-             'dbpedia': 3}
-DATASET_NAMES = {
-    'cifar100': 'CIFAR-100',
-    'imagenet': 'ImageNet',
-    'svhn': 'SVHN',
-    '20newsgroup': '20 Newsgroups',
-    'dbpedia': 'DBpedia',
-}
-EVAL_METRIC_NAMES = {
-    'avg_num_agreement': '#agreements',
-    'mrr': 'MRR'
-}
+
 COLOR = {'non-active_no_prior': '#1f77b4',
          'ts_uniform': '#ff7f0e',
          'ts_informed': 'green',
@@ -27,23 +12,6 @@ COLOR = {'non-active_no_prior': '#1f77b4',
          'bayesian_ucb_no_prior': 'cyan'
 
          }
-METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
-                    #                         'non-active_uniform': 'non-active_uniform',
-                    #                         'non-active_informed': 'non-active_informed',
-                    'ts_uniform': 'TS',
-                    'ts_informed': 'TS (informative)',
-                    'epsilon_greedy_no_prior': 'Epsilon greedy',
-                    'bayesian_ucb_no_prior': 'Bayesian UCB',
-
-                    }
-TOPK_METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
-                         #                         'non-active_uniform': 'non-active_uniform',
-                         #                         'non-active_informed': 'non-active_informed',
-                         'ts_uniform': 'MP-TS',
-                         'ts_informed': 'MP-TS (informative)',
-                         'epsilon_greedy_no_prior': 'Epsilon greedy',
-                         'bayesian_ucb_no_prior': 'Bayesian UCB',
-                         }
 DEFAULT_RC = {
     'font.size': 8,
     'font.family': 'serif',
@@ -61,15 +29,30 @@ DEFAULT_PLOT_KWARGS = {
     'linewidth': 1.2
 }
 
+METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
+                    #                         'non-active_uniform': 'non-active_uniform',
+                    #                         'non-active_informed': 'non-active_informed',
+                    'ts_uniform': 'TS',
+                    'ts_informed': 'TS (informative)',
+                    'epsilon_greedy_no_prior': 'Epsilon greedy',
+                    'bayesian_ucb_no_prior': 'Bayesian UCB',
+
+                    }
+TOPK_METHOD_NAME_DICT = {'non-active_no_prior': 'Non-active',
+                          #                         'non-active_uniform': 'non-active_uniform',
+                          #                         'non-active_informed': 'non-active_informed',
+                          'ts_uniform': 'MP-TS',
+                          'ts_informed': 'MP-TS (informative)',
+                          'epsilon_greedy_no_prior': 'Epsilon greedy',
+                          'bayesian_ucb_no_prior': 'Bayesian UCB',
+                          }
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
 GOLDEN_RATIO = 1.61803398875
 
-FIGURE_DIR = '../../figures/'
-RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
-
 ######################################CONSTANTS######################################
 import sys
+
 sys.path.insert(0, '..')
 import argparse
 from typing import Dict, Any
@@ -79,7 +62,10 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-from data_utils import DATASIZE_DICT
+from data_utils import DATASIZE_DICT, FIGURE_DIR, RESULTS_DIR
+from data_utils import DATASET_NAMES, TOPK_DICT
+
+RESULTS_DIR = RESULTS_DIR + 'active_learning_topk/'
 
 
 def plot_topk_accuracy(ax: mpl.axes.Axes,

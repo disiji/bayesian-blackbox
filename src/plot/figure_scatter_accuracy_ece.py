@@ -1,24 +1,6 @@
 ######################################CONSTANTS######################################
 num_samples = 1000
 
-TOPK_DICT = {'cifar100': 10,
-             'imagenet': 10,
-             'svhn': 3,
-             '20newsgroup': 3,
-             'dbpedia': 3}
-DATASET_NAMES = {
-    'cifar100': 'CIFAR-100',
-    'imagenet': 'ImageNet',
-    'svhn': 'SVHN',
-    '20newsgroup': '20 Newsgroups',
-    'dbpedia': 'DBpedia',
-}
-COLOR = {'non-active_no_prior': 'non-active',
-         'non-active_uniform': 'non-active_uniform',
-         'non-active_informed': 'non-active_informed',
-         'ts_uniform': 'ts(uniform)',
-         'ts_informed': 'ts(informative)'
-         }
 DEFAULT_RC = {
     'lines.markersize': 2,
     'font.size': 8,
@@ -40,9 +22,7 @@ DEFAULT_PLOT_KWARGS = {
 
 COLUMN_WIDTH = 3.25  # Inches
 TEXT_WIDTH = 6.299213  # Inches
-GOLDEN_RATIO = 1.61803398875
 
-FIGURE_DIR = '../../figures/'
 ######################################CONSTANTS######################################
 import sys
 
@@ -54,7 +34,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-from data_utils import DATAFILE_LIST, prepare_data, NUM_CLASSES_DICT
+from data_utils import DATAFILE_LIST, prepare_data, NUM_CLASSES_DICT, FIGURE_DIR, DATASET_NAMES, TOPK_DICT
 from models import BetaBernoulli, ClasswiseEce
 
 

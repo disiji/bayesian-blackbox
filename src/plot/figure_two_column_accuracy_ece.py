@@ -13,10 +13,7 @@ DEFAULT_RC = {
     'figure.titlesize': 8
 }
 COLUMN_WIDTH = 3.25  # Inches
-TEXT_WIDTH = 6.299213  # Inches
-GOLDEN_RATIO = 1.61803398875
 
-FIGURE_DIR = '../../figures/'
 ######################################CONSTANTS######################################
 import sys
 
@@ -29,7 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 
-from data_utils import DATAFILE_LIST, NUM_CLASSES_DICT, prepare_data, CIFAR100_CLASSES
+from data_utils import DATAFILE_LIST, NUM_CLASSES_DICT, prepare_data, CIFAR100_CLASSES, FIGURE_DIR
 from models import BetaBernoulli, ClasswiseEce
 
 

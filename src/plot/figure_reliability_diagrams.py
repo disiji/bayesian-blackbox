@@ -1,11 +1,4 @@
 ######################################CONSTANTS######################################
-DATASET_NAMES = {
-    'cifar100': 'CIFAR-100',
-    'imagenet': 'ImageNet',
-    'svhn': 'SVHN',
-    '20newsgroup': '20 Newsgroups',
-    'dbpedia': 'DBpedia',
-}
 DEFAULT_RC = {
     'lines.markersize': 2,
     'font.size': 6,
@@ -27,7 +20,6 @@ DEFAULT_PLOT_KWARGS = {
 num_bins = 10
 TEXT_WIDTH = 6.299213  # Inches
 
-FIGURE_DIR = '../../figures/'
 ######################################CONSTANTS######################################
 import sys
 
@@ -42,7 +34,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import beta
 
-from data_utils import DATAFILE_LIST, DATASIZE_DICT, prepare_data
+from data_utils import DATAFILE_LIST, DATASIZE_DICT, prepare_data, FIGURE_DIR, DATASET_NAMES
 from models import SumOfBetaEce
 
 
