@@ -24,13 +24,18 @@ HOLDOUT_RATIO = 0.1
 
 #########################SAMPLE AND EVAL FOR ACTIVE TOPK##########################
 def get_samples_topk(args: argparse.Namespace,
-                     dataset: Dict[str, Any],
+                     categories: List[int],
+                     observations: List[bool],
+                     confidences: List[float],
+                     labels: List[int],
+                     indices: List[int],
                      num_classes: int,
                      num_samples: int,
                      sample_method: str,
                      prior=None,
                      weight=None,
-                     random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+                     random_seed: int = 0) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    # prepare model, deques, thetas, choices
 
     random.seed(random_seed)
 
@@ -40,7 +45,7 @@ def get_samples_topk(args: argparse.Namespace,
         model = ClasswiseEce(num_classes, num_bins=10, pseudocount=args.pseudocount, weight=weight, prior=None)
 
     deques = [deque() for _ in range(num_classes)]
-    for category, score, observation, label, index in zip(dataset['category'], dataset['confidence'], dataset['observation'], dataset['label'], dataset['index']):
+    for category, score, observation, label, index in zip(categories, confidences, observations, labels, indices):
         if args.metric == 'accuracy':
             deques[category].append(observation)
         elif args.metric == 'calibration_error':
@@ -48,14 +53,11 @@ def get_samples_topk(args: argparse.Namespace,
     for _deque in deques:
         random.shuffle(_deque)
 
-    samples = {
-        'category': np.zeros((num_samples,), dtype=np.int),
-        'observation': np.zeros((num_samples,), dtype=np.int),
-        'confidence': np.zeros((num_samples,), dtype=np.float),
-        'label': np.zeros((num_samples,), dtype=np.int),
-        'index': np.zeros((num_samples,), dtype=np.int)
-    }
-
+    sampled_categories = np.zeros((num_samples,), dtype=np.int)
+    sampled_observations = np.zeros((num_samples,), dtype=np.int)
+    sampled_scores = np.zeros((num_samples,), dtype=np.float)
+    sampled_labels = np.zeros((num_samples,), dtype=np.int)
+    sampled_indices = np.zeros((num_samples,), dtype=np.int)
     sample_fct = SAMPLE_CATEGORY[sample_method]
 
     topk = args.topk
@@ -89,18 +91,18 @@ def get_samples_topk(args: argparse.Namespace,
                 model.update(category, observation)
 
             elif args.metric == 'calibration_error':
-                observation, confidence, label, index = deques[category].pop()
-                model.update(category, observation, confidence)
-                samples['confidence'][idx] = confidence
-                samples['label'][idx] = label
-                samples['index'][idx] = index
+                observation, score, label, index = deques[category].pop()
+                model.update(category, observation, score)
+                sampled_scores[idx] = score
+                sampled_labels[idx] = label
+                sampled_indices[idx] = index
 
-            samples['category'][idx] = category
-            samples['observation'][idx] = observation
+            sampled_categories[idx] = category
+            sampled_observations[idx] = observation
 
             idx += 1
 
-    return samples
+    return sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices
 
 
 def eval(args: argparse.Namespace,
