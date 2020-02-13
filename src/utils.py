@@ -1,5 +1,7 @@
 import argparse
 import ctypes
+import random
+from collections import deque
 from functools import reduce
 from multiprocessing import Array
 
@@ -7,14 +9,15 @@ import matplotlib.pyplot as plt
 
 from calibration import CALIBRATION_MODELS
 from data_utils import *
-from sampling import *
+from models import BetaBernoulli
+from sampling import SAMPLE_CATEGORY
 
 COLUMN_WIDTH = 3.25  # Inches
 GOLDEN_RATIO = 1.61803398875
 FONT_SIZE = 8
 OUTPUT_DIR = "../output/active_learning_topk"
 
-RUNS = 10
+RUNS = 100
 LOG_FREQ = 100
 CALIBRATION_FREQ = 100
 PRIOR_STRENGTH = 3
@@ -58,6 +61,7 @@ def get_samples_topk(args: argparse.Namespace,
     sampled_scores = np.zeros((num_samples,), dtype=np.float)
     sampled_labels = np.zeros((num_samples,), dtype=np.int)
     sampled_indices = np.zeros((num_samples,), dtype=np.int)
+
     sample_fct = SAMPLE_CATEGORY[sample_method]
 
     topk = args.topk
@@ -77,7 +81,7 @@ def get_samples_topk(args: argparse.Namespace,
                                      max_ttts_trial=50,
                                      ttts_beta=0.5,
                                      epsilon=0.1,
-                                     ucb_c=1, )
+                                     ucb_c=1)
 
         if type(categories_list) != list:
             categories_list = [categories_list]
@@ -105,30 +109,30 @@ def get_samples_topk(args: argparse.Namespace,
     return sampled_categories, sampled_observations, sampled_scores, sampled_labels, sampled_indices
 
 
-def eval(args: argparse.Namespace,
-         categories: List[int],
-         observations: List[bool],
-         confidences: List[float],
-         labels: List[int],
-         indices: List[int],
-         ground_truth: np.ndarray,
-         num_classes: int,
-         holdout_categories: List[int] = None,  # will be used if train classwise calibration model
-         holdout_observations: List[bool] = None,
-         holdout_confidences: List[float] = None,
-         holdout_labels: List[int] = None,
-         holdout_indices: List[int] = None,
-         prior=None,
-         weight=None) -> Tuple[np.ndarray, ...]:
+def evaluate(args: argparse.Namespace,
+             categories: List[int],
+             observations: List[bool],
+             confidences: List[float],
+             labels: List[int],
+             indices: List[int],
+             ground_truth: np.ndarray,
+             num_classes: int,
+             holdout_categories: List[int] = None,  # will be used if train classwise calibration model
+             holdout_observations: List[bool] = None,
+             holdout_confidences: List[float] = None,
+             holdout_labels: List[int] = None,
+             holdout_indices: List[int] = None,
+             prior=None,
+             weight=None) -> Tuple[np.ndarray, ...]:
     """
     Evaluate topk ground truth agains predictions made by the model, which is trained on actively or
         non-actively selected samples.
-    :return avg_num_agreement: (num_samples, ) array.
+    :return avg_num_agreement: (num_samples // LOG_FREQ, ) array.
             Average number of agreement between selected topk and ground truth topk at each step.
-    :return cumulative_metric: (num_samples, ) array.
-            Metric (accuracy or ece) measured on sampled_observations, sampled categories and sampled scores.
-    :return non_cumulative_metric: (num_samples, ) array.
-            Average metric (accuracy or ece) evaluated with model.eval of the selected topk arms at each step.
+    :return holdout_calibrated_ece: (num_samples // CALIBRATION_FREQ , ) array.
+            ECE evaluated on recalibrated holdout set.
+    :return mrr: (num_samples // LOG_FREQ, ) array.
+            MRR of ground truth topk at each step.
     """
     num_samples = len(categories)
 
@@ -255,9 +259,9 @@ def _comparison_plot(args: argparse.Namespace, eval_result_dict: Dict[str, np.nd
     plt.figure(figsize=(COLUMN_WIDTH, COLUMN_WIDTH / GOLDEN_RATIO), dpi=300)
 
     if args.metric == 'calibration_error':
-        total_samples = datasize_dict[args.dataset] * (1 - HOLDOUT_RATIO)
+        total_samples = DATASIZE_DICT[args.dataset] * (1 - HOLDOUT_RATIO)
     elif args.metric == 'accuracy':
-        total_samples = datasize_dict[args.dataset]
+        total_samples = DATASIZE_DICT[args.dataset]
 
     for method_name in eval_result_dict:
         metric_eval = eval_result_dict[method_name]

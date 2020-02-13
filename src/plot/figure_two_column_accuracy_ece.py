@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.ticker import FormatStrFormatter
 
-from data_utils import datafile_dict, num_classes_dict, prepare_data
+from data_utils import DATAFILE_LIST, NUM_CLASSES_DICT, prepare_data, CIFAR100_CLASSES
 from models import BetaBernoulli, ClasswiseEce
 
 
@@ -150,28 +150,13 @@ def plot_figure_1(accuracy: np.ndarray,
 
 
 def main():
-    # datafile = datafile_dict['cifar100']
-    # num_classes = 100
     dataset = 'cifar100'
     num_samples = 1000
 
-    datafile = datafile_dict[dataset]
-    num_classes = num_classes_dict[dataset]
+    datafile = DATAFILE_LIST[dataset]
+    num_classes = NUM_CLASSES_DICT[dataset]
 
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
-
-    class_names = ['apple', 'aquarium_fish', 'baby', 'bear', 'beaver', 'bed', 'bee', 'beetle',
-                   'bicycle', 'bottle', 'bowl', 'boy', 'bridge', 'bus', 'butterfly', 'camel', 'can', 'castle',
-                   'caterpillar', 'cattle', 'chair', 'chimpanzee', 'clock', 'cloud', 'cockroach', 'couch',
-                   'crab', 'crocodile', 'cup', 'dinosaur', 'dolphin', 'elephant', 'flatfish', 'forest', 'fox',
-                   'girl', 'hamster', 'house', 'kangaroo', 'keyboard', 'lamp', 'lawn mower', 'leopard', 'lion',
-                   'lizard', 'lobster', 'man', 'maple tree', 'motorcycle', 'mountain', 'mouse', 'mushroom',
-                   'oak tree', 'orange', 'orchid', 'otter', 'palm tree', 'pear', 'pickup truck', 'pine tree',
-                   'plain', 'plate', 'poppy', 'porcupine', 'possum', 'rabbit', 'raccoon', 'ray', 'road',
-                   'rocket', 'rose', 'sea', 'seal', 'shark', 'shrew', 'skunk', 'skyscraper', 'snail', 'snake',
-                   'spider', 'squirrel', 'streetcar', 'sunflower', 'sweet pepper', 'table', 'tank', 'telephone',
-                   'television', 'tiger', 'tractor', 'train', 'trout', 'tulip', 'turtle', 'wardrobe', 'whale',
-                   'willow tree', 'wolf', 'woman', 'worm']
 
     # accuracy models
     accuracy_model = BetaBernoulli(k=num_classes, prior=None)
@@ -191,7 +176,7 @@ def main():
     ece = np.array([np.quantile(ece_samples, 0.025, axis=1),
                     np.quantile(ece_samples, 0.5, axis=1),
                     np.quantile(ece_samples, 0.975, axis=1)]).T
-    fig, axes = plot_figure_1(accuracy, ece, labels=class_names, limit=10, reverse=False)
+    fig, axes = plot_figure_1(accuracy, ece, labels=CIFAR100_CLASSES, limit=10, reverse=False)
 
     fig.tight_layout()
     fig.subplots_adjust(bottom=-0.2, wspace=0.35)

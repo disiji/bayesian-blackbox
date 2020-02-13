@@ -69,7 +69,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-from data_utils import datasize_dict
+from data_utils import DATASIZE_DICT
 
 
 def plot_topk_ece(ax: mpl.axes.Axes,
@@ -153,7 +153,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                           experiment_name,
                           topk,
                           eval_metric,
-                          int(datasize_dict[dataset] * (1 - HOLDOUT_RATIO)),
+                          int(DATASIZE_DICT[dataset] * (1 - HOLDOUT_RATIO)),
                           threshold=threshold,
                           plot_kwargs=plot_kwargs)
             if topk == 1:

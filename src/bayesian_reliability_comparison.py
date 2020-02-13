@@ -5,7 +5,7 @@ import random
 
 import numpy as np
 
-from data_utils import datafile_dict, DATASET_LIST, prepare_data
+from data_utils import DATAFILE_LIST, DATASET_LIST, prepare_data
 from models import SumOfBetaEce
 
 random.seed(2020)
@@ -19,7 +19,7 @@ OUTPUT_DIR = "../output/bayesian_reliability_comparison/"
 def main(args) -> None:
     # load data
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
-        datafile_dict[args.dataset], False)
+        DATAFILE_LIST[args.dataset], False)
     # train a ground_truth ece model
     if args.ground_truth_type == 'bayesian':
         ground_truth_model = SumOfBetaEce(num_bins=args.num_bins, pseudocount=args.pseudocount)

@@ -42,7 +42,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats import beta
 
-from data_utils import datafile_dict, datasize_dict, prepare_data
+from data_utils import DATAFILE_LIST, DATASIZE_DICT, prepare_data
 from models import SumOfBetaEce
 
 
@@ -107,12 +107,12 @@ def main(args: argparse.Namespace):
         for dataset in DATASET_NAMES:
 
             categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
-                datafile_dict[dataset], False)
+                DATAFILE_LIST[dataset], False)
             tmp = list(zip(confidences, observations))
             random.shuffle(tmp)
             confidences, observations = zip(*tmp)
 
-            for (row_idx, N) in enumerate([100, 1000, datasize_dict[dataset]]):
+            for (row_idx, N) in enumerate([100, 1000, DATASIZE_DICT[dataset]]):
                 print(row_idx, N)
 
                 ece_model = SumOfBetaEce(num_bins=num_bins, pseudocount=args.pseudocount)

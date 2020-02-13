@@ -55,7 +55,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-from data_utils import datafile_dict, prepare_data
+from data_utils import DATAFILE_LIST, prepare_data
 from figure_reliability_diagrams import plot_bayesian_reliability_diagram
 from models import SumOfBetaEce
 
@@ -113,7 +113,7 @@ def frequentist_bootstrap_ece(confidences: List[int], observations: List[bool], 
 
 def main(args):
     dataset = 'cifar100'
-    datafile = datafile_dict[dataset]
+    datafile = DATAFILE_LIST[dataset]
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
 
     tmp = list(zip(confidences, observations))

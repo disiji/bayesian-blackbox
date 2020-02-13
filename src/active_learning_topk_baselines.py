@@ -9,18 +9,18 @@ logger = logging.getLogger(__name__)
 process_lock = Lock()
 
 
-def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
-    num_classes = num_classes_dict[args.dataset]
+def main_accuracy_topk(args: argparse.Namespace, sample=True, eval=True, plot=True) -> None:
+    num_classes = NUM_CLASSES_DICT[args.dataset]
 
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
-        datafile_dict[args.dataset], False)
+        DATAFILE_LIST[args.dataset], False)
     indices = np.arange(len(categories))
 
     num_samples = len(observations)
 
-    UNIFORM_PRIOR = np.ones((num_classes, 2)) / 2 * args.pseudocount
+    uniform_prior = np.ones((num_classes, 2)) / 2 * args.pseudocount
     confidence = get_confidence_k(categories, confidences, num_classes)
-    INFORMED_PRIOR = np.array([confidence, 1 - confidence]).T * args.pseudocount
+    informed_prior = np.array([confidence, 1 - confidence]).T * args.pseudocount
 
     experiment_name = '%s_%s_%s_top%d_runs%d_pseudocount%.2f' % (
         args.dataset, args.metric, args.mode, args.topk, RUNS, args.pseudocount)
@@ -65,7 +65,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
         'bayesian_ucb_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
 
-    if SAMPLE:
+    if sample:
         for r in tqdm(range(RUNS)):
             sampled_categories_dict['epsilon_greedy'][r], sampled_observations_dict['epsilon_greedy'][r], \
             sampled_scores_dict['epsilon_greedy'][r], sampled_labels_dict['epsilon_greedy'][r], \
@@ -78,7 +78,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                          num_classes,
                                                                          num_samples,
                                                                          sample_method='epsilon_greedy',
-                                                                         prior=UNIFORM_PRIOR * 1e-6,
+                                                                         prior=uniform_prior * 1e-6,
                                                                          random_seed=r)
             sampled_categories_dict['bayesian_ucb'][r], sampled_observations_dict['bayesian_ucb'][r], \
             sampled_scores_dict['bayesian_ucb'][r], sampled_labels_dict['bayesian_ucb'][r], \
@@ -91,7 +91,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                                                        num_classes,
                                                                        num_samples,
                                                                        sample_method='bayesian_ucb',
-                                                                       prior=UNIFORM_PRIOR * 1e-6,
+                                                                       prior=uniform_prior * 1e-6,
                                                                        random_seed=r)
         # write samples to file
         for method in ['epsilon_greedy', 'bayesian_ucb']:
@@ -113,12 +113,12 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
 
-    if EVAL:
+    if eval:
         ground_truth = get_ground_truth(categories, observations, confidences, num_classes, args.metric, args.mode,
                                         topk=args.topk)
 
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['epsilon_greedy_no_prior'][r], mrr_dict['epsilon_greedy_no_prior'][r] = eval(
+            avg_num_agreement_dict['epsilon_greedy_no_prior'][r], mrr_dict['epsilon_greedy_no_prior'][r] = evaluate(
                 args,
                 sampled_categories_dict['epsilon_greedy'][r].tolist(),
                 sampled_observations_dict['epsilon_greedy'][r].tolist(),
@@ -127,8 +127,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['epsilon_greedy'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=UNIFORM_PRIOR * 1e-6)
-            avg_num_agreement_dict['epsilon_greedy_uniform'][r], mrr_dict['epsilon_greedy_uniform'][r] = eval(
+                prior=uniform_prior * 1e-6)
+            avg_num_agreement_dict['epsilon_greedy_uniform'][r], mrr_dict['epsilon_greedy_uniform'][r] = evaluate(
                 args,
                 sampled_categories_dict['epsilon_greedy'][r].tolist(),
                 sampled_observations_dict['epsilon_greedy'][r].tolist(),
@@ -137,8 +137,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['epsilon_greedy'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=UNIFORM_PRIOR)
-            avg_num_agreement_dict['epsilon_greedy_informed'][r], mrr_dict['epsilon_greedy_informed'][r] = eval(
+                prior=uniform_prior)
+            avg_num_agreement_dict['epsilon_greedy_informed'][r], mrr_dict['epsilon_greedy_informed'][r] = evaluate(
                 args,
                 sampled_categories_dict['epsilon_greedy'][r].tolist(),
                 sampled_observations_dict['epsilon_greedy'][r].tolist(),
@@ -147,8 +147,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['epsilon_greedy'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=INFORMED_PRIOR)
-            avg_num_agreement_dict['bayesian_ucb_no_prior'][r], mrr_dict['bayesian_ucb_no_prior'][r] = eval(
+                prior=informed_prior)
+            avg_num_agreement_dict['bayesian_ucb_no_prior'][r], mrr_dict['bayesian_ucb_no_prior'][r] = evaluate(
                 args,
                 sampled_categories_dict['bayesian_ucb'][r].tolist(),
                 sampled_observations_dict['bayesian_ucb'][r].tolist(),
@@ -157,8 +157,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['bayesian_ucb'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=UNIFORM_PRIOR * 1e-6)
-            avg_num_agreement_dict['bayesian_ucb_uniform'][r], mrr_dict['bayesian_ucb_uniform'][r] = eval(
+                prior=uniform_prior * 1e-6)
+            avg_num_agreement_dict['bayesian_ucb_uniform'][r], mrr_dict['bayesian_ucb_uniform'][r] = evaluate(
                 args,
                 sampled_categories_dict['bayesian_ucb'][r].tolist(),
                 sampled_observations_dict['bayesian_ucb'][r].tolist(),
@@ -167,8 +167,8 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['bayesian_ucb'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=UNIFORM_PRIOR)
-            avg_num_agreement_dict['bayesian_ucb_informed'][r], mrr_dict['bayesian_ucb_informed'][r] = eval(
+                prior=uniform_prior)
+            avg_num_agreement_dict['bayesian_ucb_informed'][r], mrr_dict['bayesian_ucb_informed'][r] = evaluate(
                 args,
                 sampled_categories_dict['bayesian_ucb'][r].tolist(),
                 sampled_observations_dict['bayesian_ucb'][r].tolist(),
@@ -177,7 +177,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 sampled_indices_dict['bayesian_ucb'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
-                prior=INFORMED_PRIOR)
+                prior=informed_prior)
 
         for method in ['epsilon_greedy_no_prior', 'epsilon_greedy_uniform', 'epsilon_greedy_informed',
                        'bayesian_ucb_no_prior', 'bayesian_ucb_uniform', 'bayesian_ucb_informed']:
@@ -191,24 +191,23 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             mrr_dict[method] = np.load(args.output / experiment_name / ('mrr_%s.npy' % method))
 
-    if PLOT:
+    if plot:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, mrr_dict=mrr_dict, is_baseline=True)
 
 
-def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
-    num_classes = num_classes_dict[args.dataset]
+def main_calibration_error_topk(args: argparse.Namespace, sample=True, eval=True, plot=True) -> None:
+    num_classes = NUM_CLASSES_DICT[args.dataset]
 
     global logits
-    logits_path = logits_dict.get(args.dataset,
-                                  None)  # Since we haven't created all the logits yet, assign defaul value of None.
+    logits_path = LOGITSFILE_DICT.get(args.dataset,
+                                      None)  # Since we haven't created all the logits yet, assign defaul value of None.
     if logits_path is not None:
         logits = np.genfromtxt(logits_path)[:, 1:]
     else:
         logits = None
-    logits_lock = Lock()
 
     categories, observations, confidences, idx2category, category2idx, labels = prepare_data(
-        datafile_dict[args.dataset], False)
+        DATAFILE_LIST[args.dataset], False)
     indices = np.arange(len(categories))
 
     categories, observations, confidences, labels, indices, \
@@ -257,7 +256,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
     }
 
-    if SAMPLE:
+    if sample:
         logger.info('Starting sampling')
 
         def sampler_worker(queue):
@@ -365,7 +364,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             sampled_labels_dict[method] = np.load(args.output / experiment_name / ('sampled_labels_%s.npy' % method))
             sampled_indices_dict[method] = np.load(args.output / experiment_name / ('sampled_indices_%s.npy' % method))
 
-    if EVAL:
+    if eval:
         logger.info('Starting evaluation')
         ground_truth = get_bayesian_ground_truth(categories, observations, confidences, num_classes, args.metric,
                                                  args.mode, topk=args.topk, pseudocount=args.pseudocount)
@@ -375,19 +374,19 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 run_idx, method = queue.get()
                 with process_lock:
                     logger.debug(f'Working on eval task :: Run: {run_idx} :: Method {method}')
-                agreement, metric, noncum_metric, ece, mrr = eval(args,
-                                                                  sampled_categories_dict[method][run_idx].tolist(),
-                                                                  sampled_observations_dict[method][run_idx].tolist(),
-                                                                  sampled_scores_dict[method][run_idx].tolist(),
-                                                                  sampled_labels_dict[method][run_idx].tolist(),
-                                                                  sampled_indices_dict[method][run_idx].tolist(),
-                                                                  ground_truth,
-                                                                  num_classes=num_classes,
-                                                                  holdout_categories=holdout_categories,
-                                                                  holdout_observations=holdout_observations,
-                                                                  holdout_confidences=holdout_confidences,
-                                                                  holdout_labels=holdout_labels,
-                                                                  holdout_indices=holdout_indices)
+                agreement, ece, mrr = evaluate(args,
+                                               sampled_categories_dict[method][run_idx].tolist(),
+                                               sampled_observations_dict[method][run_idx].tolist(),
+                                               sampled_scores_dict[method][run_idx].tolist(),
+                                               sampled_labels_dict[method][run_idx].tolist(),
+                                               sampled_indices_dict[method][run_idx].tolist(),
+                                               ground_truth,
+                                               num_classes,
+                                               holdout_categories=holdout_categories,
+                                               holdout_observations=holdout_observations,
+                                               holdout_confidences=holdout_confidences,
+                                               holdout_labels=holdout_labels,
+                                               holdout_indices=holdout_indices)
 
                 # Write outputs
                 avg_num_agreement_array = avg_num_agreement_dict[method]
@@ -449,7 +448,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             holdout_ece_dict[method] = np.load(
                 args.output / experiment_name / ('holdout_ece_%s_%s.npy' % (args.calibration_model, method)))
 
-    if PLOT:
+    if plot:
         comparison_plot(args, experiment_name, avg_num_agreement_dict, holdout_ece_dict, mrr_dict=mrr_dict,
                         is_baseline=True)
 
@@ -481,6 +480,6 @@ if __name__ == "__main__":
 
     logger.info(f'Dataset: {args.dataset} :: Model: {args.mode}')
     if args.metric == 'accuracy':
-        main_accuracy_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_accuracy_topk(args, sample=True, eval=True, plot=True)
     elif args.metric == 'calibration_error':
-        main_calibration_error_topk(args, SAMPLE=True, EVAL=True, PLOT=True)
+        main_calibration_error_topk(args, sample=True, eval=True, plot=True)

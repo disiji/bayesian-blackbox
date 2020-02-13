@@ -10,8 +10,7 @@ from sklearn.metrics import confusion_matrix
 from tqdm import tqdm
 
 from active_learning_topk import mean_reciprocal_rank
-from data_utils import cifar100_superclass_lookup
-from data_utils import datafile_dict, cost_matrix_dir_dict
+from data_utils import CIFAR100_SUPERCLASS_LOOKUP, DATAFILE_LIST, COST_MATRIX_FILE_DICT
 from models import DirichletMultinomialCost, Model
 
 logger = logging.getLogger(__name__)
@@ -277,11 +276,11 @@ def main(args: argparse.Namespace) -> None:
 
     # Load the dataset and cost matrix
     if args.superclass:
-        dataset = SuperclassDataset.load_from_text(datafile_dict[args.dataset], cifar100_superclass_lookup)
+        dataset = SuperclassDataset.load_from_text(DATAFILE_LIST[args.dataset], CIFAR100_SUPERCLASS_LOOKUP)
     else:
-        dataset = Dataset.load_from_text(datafile_dict[args.dataset])
+        dataset = Dataset.load_from_text(DATAFILE_LIST[args.dataset])
 
-    cost_matrix = cost_matrix_dir_dict[args.type_cost]
+    cost_matrix = COST_MATRIX_FILE_DICT[args.type_cost]
 
     if cost_matrix is None:
         if args.superclass:

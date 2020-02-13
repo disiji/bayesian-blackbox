@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 np.random.seed(0)
 
 DATA_DIR = '/Users/disiji/Dropbox/current/bayesian-blackbox/data/'
-datafile_dict = {
+DATAFILE_LIST = {
     'cifar100': DATA_DIR + 'cifar100/cifar100_predictions_dropout.txt',
     'imagenet': DATA_DIR + 'imagenet/resnet152_imagenet_outputs.txt',
     'imagenet2_topimages': DATA_DIR + 'imagenet/resnet152_imagenetv2_topimages_outputs.txt',
@@ -20,12 +20,12 @@ datafile_dict = {
     'svhn': DATA_DIR + 'svhn/svhn_predictions.txt',
     'dbpedia': DATA_DIR + 'dbpedia/bert_dbpedia_outputs.txt',
 }
-logits_dict = {
+LOGITSFILE_DICT = {
     'cifar100': DATA_DIR + 'cifar100/resnet110_cifar100_logits.txt',
     'imagenet': DATA_DIR + 'imagenet/resnet152_imagenet_logits.txt',
 }
 
-datasize_dict = {
+DATASIZE_DICT = {
     'cifar100': 10000,
     'imagenet': 50000,
     'imagenet2_topimages': 10000,
@@ -33,7 +33,7 @@ datasize_dict = {
     'svhn': 26032,
     'dbpedia': 70000,
 }
-num_classes_dict = {
+NUM_CLASSES_DICT = {
     'cifar100': 100,
     'imagenet': 1000,
     'imagenet2_topimages': 1000,
@@ -41,21 +41,7 @@ num_classes_dict = {
     'svhn': 10,
     'dbpedia': 14,
 }
-output_str_dict = {
-    'weighted_pool_bayesian_estimation_error': 'weighted_pool_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'weighted_pool_frequentist_estimation_error': 'weighted_pool_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
-    'weighted_online_bayesian_estimation_error': 'weighted_online_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'weighted_online_frequentist_estimation_error': 'weighted_online_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
-    'unweighted_bayesian_estimation_error': 'unweighted_error_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'unweighted_frequentist_estimation_error': 'unweighted_error_%s_PseudoCount%.1f_runs%d_frequentist.csv',
-    'pool_bayesian_ece': 'pool_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'pool_frequentist_ece': 'pool_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv',
-    'online_bayesian_ece': 'online_ece_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'online_frequentist_ece': 'online_ece_%s_PseudoCount%.1f_runs%d_frequentist.csv',
-    'bayesian_mce': 'mce_%s_PseudoCount%.1f_runs%d_bayesian.csv',
-    'frequentist_mce': 'mce_%s_PseudoCount%.1f_runs%d_frequentist.csv'
-}
-cost_matrix_dir_dict = {
+COST_MATRIX_FILE_DICT = {
     'human': DATA_DIR + 'cost/cifar100_people_full/costs.npy',
     'superclass': DATA_DIR + 'cost/cifar100_superclass_full/costs.npy'
 }
@@ -64,7 +50,7 @@ DATASET_LIST = ['imagenet', 'dbpedia', 'cifar100', '20newsgroup', 'svhn', 'image
 ############################################################################
 # CIFAR100 meta data needed to map classes to superclasses and vice versa.
 
-cifar100_classes = [
+CIFAR100_CLASSES = [
     "apple", "aquarium_fish", "baby", "bear", "beaver", "bed", "bee", "beetle", "bicycle",
     "bottle", "bowl", "boy", "bridge", "bus", "butterfly", "camel", "can", "castle",
     "caterpillar", "cattle", "chair", "chimpanzee", "clock", "cloud", "cockroach", "couch",
@@ -79,7 +65,7 @@ cifar100_classes = [
     "willow_tree", "wolf", "woman", "worm"
 ]
 
-cifar100_superclasses = [
+CIFAR100_SUPERCLASSES = [
     "aquatic_mammals", "fish", "flowers", "food_containers", "fruit_and_vegetables",
     "household_electrical_devices", "household_furniture", "insects", "large_carnivores",
     "large_man-made_outdoor_things", "large_natural_outdoor_scenes",
@@ -87,7 +73,7 @@ cifar100_superclasses = [
     "reptiles", "small_mammals", "trees", "vehicles_1", "vehicles_2"
 ]
 
-cifar100_reverse_superclass_lookup = {
+CIFAR100_REVERSE_SUPERCLASS_LOOKUP = {
     "aquatic_mammals": ["beaver", "dolphin", "otter", "seal", "whale"],
     "fish": ["aquarium_fish", "flatfish", "ray", "shark", "trout"],
     "flowers": ["orchid", "poppy", "rose", "sunflower", "tulip"],
@@ -110,8 +96,8 @@ cifar100_reverse_superclass_lookup = {
     "vehicles_2": ["lawn_mower", "rocket", "streetcar", "tank", "tractor"]
 }
 
-cifar100_superclass_lookup = {class_: superclass for superclass, class_list in
-                              cifar100_reverse_superclass_lookup.items() for class_ in
+CIFAR100_SUPERCLASS_LOOKUP = {class_: superclass for superclass, class_list in
+                              CIFAR100_REVERSE_SUPERCLASS_LOOKUP.items() for class_ in
                               class_list}
 
 

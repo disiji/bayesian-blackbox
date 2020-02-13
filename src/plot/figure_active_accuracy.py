@@ -67,6 +67,7 @@ GOLDEN_RATIO = 1.61803398875
 
 FIGURE_DIR = '../../figures/'
 RESULTS_DIR = '/Volumes/deepdata/bayesian_blackbox/output_from_datalab_20200201/output/active_learning_topk/'
+
 ######################################CONSTANTS######################################
 import sys
 sys.path.insert(0, '..')
@@ -78,7 +79,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import numpy as np
 
-from data_utils import datasize_dict
+from data_utils import DATASIZE_DICT
 
 
 def plot_topk_accuracy(ax: mpl.axes.Axes,
@@ -168,7 +169,7 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
                                experiment_name,
                                topk,
                                eval_metric,
-                               datasize_dict[dataset],
+                               DATASIZE_DICT[dataset],
                                threshold=threshold,
                                plot_kwargs=plot_kwargs)
             if topk == 1:
@@ -197,7 +198,6 @@ def main(eval_metric: str, top1: bool, pseudocount: int, threshold: float) -> No
 
 def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
     with mpl.rc_context(rc=DEFAULT_RC):
-        # fig, axes = plt.subplots(ncols=2, nrows=2, dpi=300, sharey=True)
         fig, axes = plt.subplots(ncols=2, nrows=1, dpi=300, sharey=True)
         for idx, dataset in enumerate(['imagenet', 'svhn']):
             plot_kwargs = {}
@@ -208,7 +208,7 @@ def main_informed(eval_metric: str, pseudocount: int, threshold: float) -> None:
                                experiment_name,
                                1,
                                eval_metric,
-                               datasize_dict[dataset],
+                               DATASIZE_DICT[dataset],
                                threshold=threshold,
                                plot_kwargs=plot_kwargs,
                                plot_informed=True)

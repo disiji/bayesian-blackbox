@@ -54,7 +54,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 
-from data_utils import datafile_dict, prepare_data, num_classes_dict
+from data_utils import DATAFILE_LIST, prepare_data, NUM_CLASSES_DICT
 from models import BetaBernoulli, ClasswiseEce
 
 
@@ -103,8 +103,8 @@ def main() -> None:
         fig, axes = plt.subplots(ncols=3, nrows=2, dpi=300, sharey=False)
         idx = 0
         for dataset in DATASET_NAMES:
-            datafile = datafile_dict[dataset]
-            num_classes = num_classes_dict[dataset]
+            datafile = DATAFILE_LIST[dataset]
+            num_classes = NUM_CLASSES_DICT[dataset]
 
             categories, observations, confidences, idx2category, category2idx, labels = prepare_data(datafile, False)
 

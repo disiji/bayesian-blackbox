@@ -188,16 +188,16 @@ def plot_confusion(new_idx):
 
 
 def main():
-    class_idx = {s: i for i, s in enumerate(cifar100_classes)}
-    superclass_idx = {s: i for i, s in enumerate(cifar100_superclasses)}
+    class_idx = {s: i for i, s in enumerate(CIFAR100_CLASSES)}
+    superclass_idx = {s: i for i, s in enumerate(CIFAR100_SUPERCLASSES)}
     superclass_lookup = {}
-    for superclass, class_list in cifar100_reverse_superclass_lookup.items():
+    for superclass, class_list in CIFAR100_REVERSE_SUPERCLASS_LOOKUP.items():
         for _class in class_list:
             superclass_lookup[class_idx[_class]] = superclass_idx[superclass]
 
     new_idx = []
-    for superclass_name in cifar100_reverse_superclass_lookup:
-        for class_name in cifar100_reverse_superclass_lookup[superclass_name]:
+    for superclass_name in CIFAR100_REVERSE_SUPERCLASS_LOOKUP:
+        for class_name in CIFAR100_REVERSE_SUPERCLASS_LOOKUP[superclass_name]:
             new_idx.append(class_idx[class_name])
     new_idx = np.array(new_idx)
 

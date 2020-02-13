@@ -205,15 +205,14 @@ class SumOfBetaEce(Model):
         return np.dot(np.abs(accuracy - self._confidence), weight)
 
     @property
-    def variance(self, num_samples: int = 100) -> float:
+    def variance(self) -> float:
         """
         Variance of posterior ECE estimated with sampling. Variance of a model is used in Bayesian active learning
             methods like Bayesian UCB.
-        :param num_samples : int
-            Number of times to sample from posterior to estiamte variance. Default: 100.
         :return: float
             Variance of posterior ECE estimated with Monte Carlo samples.
         """
+        num_samples = 100
         samples = self.sample(num_samples)
         return np.var(samples)
 
@@ -390,7 +389,7 @@ class ClasswiseEce(Model):
         return classwise_ece_variance
 
     @property
-    def variance(self, num_samples: int = 100) -> np.ndarray:
+    def variance(self) -> np.ndarray:
         """
         Variance of posterior ECE for each class.
         :param num_samples: int
@@ -398,7 +397,7 @@ class ClasswiseEce(Model):
         :return: An (k,) array of variance evaluate for each class.
         """
         classwise_ece_variance = np.array(
-            [self._classwise_ece_models[class_idx].variance(num_samples) for class_idx in range(self._k)])
+            [self._classwise_ece_models[class_idx].variance for class_idx in range(self._k)])
         return classwise_ece_variance
 
     @property
