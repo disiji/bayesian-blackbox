@@ -27,93 +27,74 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
 
     if not (args.output / experiment_name).is_dir():
         (args.output / experiment_name).mkdir()
-
     sampled_categories_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=int),
-        'ts_uniform': np.empty((RUNS, num_samples), dtype=int),
-        'ts_informed': np.empty((RUNS, num_samples), dtype=int),
+        'epsilon_greedy': np.empty((RUNS, num_samples), dtype=int),
+        'bayesian_ucb': np.empty((RUNS, num_samples), dtype=int),
     }
     sampled_observations_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=bool),
-        'ts_uniform': np.empty((RUNS, num_samples), dtype=bool),
-        'ts_informed': np.empty((RUNS, num_samples), dtype=bool),
+        'epsilon_greedy': np.empty((RUNS, num_samples), dtype=bool),
+        'bayesian_ucb': np.empty((RUNS, num_samples), dtype=bool),
     }
     sampled_scores_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=float),
-        'ts_uniform': np.empty((RUNS, num_samples), dtype=float),
-        'ts_informed': np.empty((RUNS, num_samples), dtype=float),
+        'epsilon_greedy': np.empty((RUNS, num_samples), dtype=float),
+        'bayesian_ucb': np.empty((RUNS, num_samples), dtype=float),
     }
     sampled_labels_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=int),
-        'ts_uniform': np.empty((RUNS, num_samples), dtype=int),
-        'ts_informed': np.empty((RUNS, num_samples), dtype=int),
+        'epsilon_greedy': np.empty((RUNS, num_samples), dtype=int),
+        'bayesian_ucb': np.empty((RUNS, num_samples), dtype=int),
     }
     sampled_indices_dict = {
-        'non-active': np.empty((RUNS, num_samples), dtype=int),
-        'ts_uniform': np.empty((RUNS, num_samples), dtype=int),
-        'ts_informed': np.empty((RUNS, num_samples), dtype=int),
+        'epsilon_greedy': np.empty((RUNS, num_samples), dtype=int),
+        'bayesian_ucb': np.empty((RUNS, num_samples), dtype=int),
     }
 
     avg_num_agreement_dict = {
-        'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
     mrr_dict = {
-        'non-active_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'non-active_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
-        'ts_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'epsilon_greedy_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_no_prior': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_uniform': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
+        'bayesian_ucb_informed': np.zeros((RUNS, num_samples // LOG_FREQ + 1)),
     }
 
     if SAMPLE:
         for r in tqdm(range(RUNS)):
-            sampled_categories_dict['non-active'][r], sampled_observations_dict['non-active'][r], \
-            sampled_scores_dict['non-active'][r], sampled_labels_dict['non-active'][r], \
-            sampled_indices_dict['non-active'][r] = get_samples_topk(args,
-                                                                     categories,
-                                                                     observations,
-                                                                     confidences,
-                                                                     labels,
-                                                                     indices,
-                                                                     num_classes,
-                                                                     num_samples,
-                                                                     sample_method='random',
-                                                                     prior=UNIFORM_PRIOR * 1e-6,
-                                                                     random_seed=r)
-
-            sampled_categories_dict['ts_uniform'][r], sampled_observations_dict['ts_uniform'][r], \
-            sampled_scores_dict['ts_uniform'][r], sampled_labels_dict['ts_uniform'][r], \
-            sampled_indices_dict['ts_uniform'][r] = get_samples_topk(args,
-                                                                     categories,
-                                                                     observations,
-                                                                     confidences,
-                                                                     labels,
-                                                                     indices,
-                                                                     num_classes,
-                                                                     num_samples,
-                                                                     sample_method='ts',
-                                                                     prior=UNIFORM_PRIOR,
-                                                                     random_seed=r)
-
-            sampled_categories_dict['ts_informed'][r], sampled_observations_dict['ts_informed'][r], \
-            sampled_scores_dict['ts_informed'][r], sampled_labels_dict['ts_informed'][r], \
-            sampled_indices_dict['ts_informed'][r] = get_samples_topk(args,
-                                                                      categories,
-                                                                      observations,
-                                                                      confidences,
-                                                                      labels,
-                                                                      indices,
-                                                                      num_classes,
-                                                                      num_samples,
-                                                                      sample_method='ts',
-                                                                      prior=INFORMED_PRIOR,
-                                                                      random_seed=r)
+            sampled_categories_dict['epsilon_greedy'][r], sampled_observations_dict['epsilon_greedy'][r], \
+            sampled_scores_dict['epsilon_greedy'][r], sampled_labels_dict['epsilon_greedy'][r], \
+            sampled_indices_dict['epsilon_greedy'][r] = get_samples_topk(args,
+                                                                         categories,
+                                                                         observations,
+                                                                         confidences,
+                                                                         labels,
+                                                                         indices,
+                                                                         num_classes,
+                                                                         num_samples,
+                                                                         sample_method='epsilon_greedy',
+                                                                         prior=UNIFORM_PRIOR * 1e-6,
+                                                                         random_seed=r)
+            sampled_categories_dict['bayesian_ucb'][r], sampled_observations_dict['bayesian_ucb'][r], \
+            sampled_scores_dict['bayesian_ucb'][r], sampled_labels_dict['bayesian_ucb'][r], \
+            sampled_indices_dict['bayesian_ucb'][r] = get_samples_topk(args,
+                                                                       categories,
+                                                                       observations,
+                                                                       confidences,
+                                                                       labels,
+                                                                       indices,
+                                                                       num_classes,
+                                                                       num_samples,
+                                                                       sample_method='bayesian_ucb',
+                                                                       prior=UNIFORM_PRIOR * 1e-6,
+                                                                       random_seed=r)
         # write samples to file
-        for method in ['non-active', 'ts_uniform', 'ts_informed']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
                     sampled_categories_dict[method])
             np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
@@ -123,7 +104,7 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
             np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method), sampled_indices_dict[method])
     else:
         # load sampled categories, scores and observations from file
-        for method in ['non-active', 'ts_uniform', 'ts_informed']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             sampled_categories_dict[method] = np.load(
                 args.output / experiment_name / ('sampled_categories_%s.npy' % method))
             sampled_observations_dict[method] = np.load(
@@ -137,71 +118,81 @@ def main_accuracy_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=Tr
                                         topk=args.topk)
 
         for r in tqdm(range(RUNS)):
-            avg_num_agreement_dict['non-active_no_prior'][r], mrr_dict['non-active_no_prior'][r] = eval(
+            avg_num_agreement_dict['epsilon_greedy_no_prior'][r], mrr_dict['epsilon_greedy_no_prior'][r] = eval(
                 args,
-                sampled_categories_dict['non-active'][r].tolist(),
-                sampled_observations_dict['non-active'][r].tolist(),
-                sampled_scores_dict['non-active'][r].tolist(),
-                sampled_labels_dict['non-active'][r].tolist(),
-                sampled_indices_dict['non-active'][r].tolist(),
+                sampled_categories_dict['epsilon_greedy'][r].tolist(),
+                sampled_observations_dict['epsilon_greedy'][r].tolist(),
+                sampled_scores_dict['epsilon_greedy'][r].tolist(),
+                sampled_labels_dict['epsilon_greedy'][r].tolist(),
+                sampled_indices_dict['epsilon_greedy'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
                 prior=UNIFORM_PRIOR * 1e-6)
-            avg_num_agreement_dict['non-active_uniform'][r], mrr_dict['non-active_uniform'][r] = eval(
+            avg_num_agreement_dict['epsilon_greedy_uniform'][r], mrr_dict['epsilon_greedy_uniform'][r] = eval(
                 args,
-                sampled_categories_dict['non-active'][r].tolist(),
-                sampled_observations_dict['non-active'][r].tolist(),
-                sampled_scores_dict['non-active'][r].tolist(),
-                sampled_labels_dict['non-active'][r].tolist(),
-                sampled_indices_dict['non-active'][r].tolist(),
+                sampled_categories_dict['epsilon_greedy'][r].tolist(),
+                sampled_observations_dict['epsilon_greedy'][r].tolist(),
+                sampled_scores_dict['epsilon_greedy'][r].tolist(),
+                sampled_labels_dict['epsilon_greedy'][r].tolist(),
+                sampled_indices_dict['epsilon_greedy'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
                 prior=UNIFORM_PRIOR)
-            avg_num_agreement_dict['non-active_informed'][r], mrr_dict['non-active_informed'][r] = eval(
+            avg_num_agreement_dict['epsilon_greedy_informed'][r], mrr_dict['epsilon_greedy_informed'][r] = eval(
                 args,
-                sampled_categories_dict['non-active'][r].tolist(),
-                sampled_observations_dict['non-active'][r].tolist(),
-                sampled_scores_dict['non-active'][r].tolist(),
-                sampled_labels_dict['non-active'][r].tolist(),
-                sampled_indices_dict['non-active'][r].tolist(),
+                sampled_categories_dict['epsilon_greedy'][r].tolist(),
+                sampled_observations_dict['epsilon_greedy'][r].tolist(),
+                sampled_scores_dict['epsilon_greedy'][r].tolist(),
+                sampled_labels_dict['epsilon_greedy'][r].tolist(),
+                sampled_indices_dict['epsilon_greedy'][r].tolist(),
+                ground_truth,
+                num_classes=num_classes,
+                prior=INFORMED_PRIOR)
+            avg_num_agreement_dict['bayesian_ucb_no_prior'][r], mrr_dict['bayesian_ucb_no_prior'][r] = eval(
+                args,
+                sampled_categories_dict['bayesian_ucb'][r].tolist(),
+                sampled_observations_dict['bayesian_ucb'][r].tolist(),
+                sampled_scores_dict['bayesian_ucb'][r].tolist(),
+                sampled_labels_dict['bayesian_ucb'][r].tolist(),
+                sampled_indices_dict['bayesian_ucb'][r].tolist(),
+                ground_truth,
+                num_classes=num_classes,
+                prior=UNIFORM_PRIOR * 1e-6)
+            avg_num_agreement_dict['bayesian_ucb_uniform'][r], mrr_dict['bayesian_ucb_uniform'][r] = eval(
+                args,
+                sampled_categories_dict['bayesian_ucb'][r].tolist(),
+                sampled_observations_dict['bayesian_ucb'][r].tolist(),
+                sampled_scores_dict['bayesian_ucb'][r].tolist(),
+                sampled_labels_dict['bayesian_ucb'][r].tolist(),
+                sampled_indices_dict['bayesian_ucb'][r].tolist(),
+                ground_truth,
+                num_classes=num_classes,
+                prior=UNIFORM_PRIOR)
+            avg_num_agreement_dict['bayesian_ucb_informed'][r], mrr_dict['bayesian_ucb_informed'][r] = eval(
+                args,
+                sampled_categories_dict['bayesian_ucb'][r].tolist(),
+                sampled_observations_dict['bayesian_ucb'][r].tolist(),
+                sampled_scores_dict['bayesian_ucb'][r].tolist(),
+                sampled_labels_dict['bayesian_ucb'][r].tolist(),
+                sampled_indices_dict['bayesian_ucb'][r].tolist(),
                 ground_truth,
                 num_classes=num_classes,
                 prior=INFORMED_PRIOR)
 
-            avg_num_agreement_dict['ts_uniform'][r], mrr_dict['ts_uniform'][r] = eval(
-                args,
-                sampled_categories_dict['ts_uniform'][r].tolist(),
-                sampled_observations_dict['ts_uniform'][r].tolist(),
-                sampled_scores_dict['ts_uniform'][r].tolist(),
-                sampled_labels_dict['ts_uniform'][r].tolist(),
-                sampled_indices_dict['ts_uniform'][r].tolist(),
-                ground_truth,
-                num_classes=num_classes,
-                prior=UNIFORM_PRIOR)
-
-            avg_num_agreement_dict['ts_informed'][r], mrr_dict['ts_informed'][r] = eval(
-                args,
-                sampled_categories_dict['ts_informed'][r].tolist(),
-                sampled_observations_dict['ts_informed'][r].tolist(),
-                sampled_scores_dict['ts_informed'][r].tolist(),
-                sampled_labels_dict['ts_informed'][r].tolist(),
-                sampled_indices_dict['ts_informed'][r].tolist(),
-                ground_truth,
-                num_classes=num_classes,
-                prior=INFORMED_PRIOR)
-
-        for method in ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']:
+        for method in ['epsilon_greedy_no_prior', 'epsilon_greedy_uniform', 'epsilon_greedy_informed',
+                       'bayesian_ucb_no_prior', 'bayesian_ucb_uniform', 'bayesian_ucb_informed']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('mrr_%s.npy' % method), mrr_dict[method])
     else:
-        for method in ['non-active_no_prior', 'non-active_uniform', 'non-active_informed', 'ts_uniform', 'ts_informed']:
+        for method in ['epsilon_greedy_no_prior', 'epsilon_greedy_uniform', 'epsilon_greedy_informed',
+                       'bayesian_ucb_no_prior', 'bayesian_ucb_uniform', 'bayesian_ucb_informed']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             mrr_dict[method] = np.load(args.output / experiment_name / ('mrr_%s.npy' % method))
 
     if PLOT:
-        comparison_plot(args, experiment_name, avg_num_agreement_dict, mrr_dict=mrr_dict)
+        comparison_plot(args, experiment_name, avg_num_agreement_dict, mrr_dict=mrr_dict, is_baseline=True)
 
 
 def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True, PLOT=True) -> None:
@@ -233,37 +224,37 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         (args.output / experiment_name).mkdir()
 
     sampled_categories_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
     sampled_observations_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples), dtype=np.bool),
     }
     sampled_scores_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples), dtype=np.float),
     }
     sampled_labels_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
     sampled_indices_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
-        'ts': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples), dtype=np.int),
     }
 
     avg_num_agreement_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
-        'ts': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples // LOG_FREQ + 1), dtype=np.float),
     }
     mrr_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
-        'ts': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
     }
     holdout_ece_dict = {
-        'non-active': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
-        'ts': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
+        'epsilon_greedy': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
+        'bayesian_ucb': MpSafeSharedArray((RUNS, num_samples // CALIBRATION_FREQ + 1), dtype=np.float),
     }
 
     if SAMPLE:
@@ -275,7 +266,6 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 # Get a job (e.g. run index)
                 run_idx, sample_method = queue.get()
 
-                # @disiji - update if you change the name...
                 if sample_method == 'non-active':
                     method = 'random'
                 else:
@@ -327,8 +317,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         logger.debug('Enqueueing sampling tasks')
         sampling_job_queue = JoinableQueue()
         for i in range(RUNS):
-            sampling_job_queue.put((i, 'non-active'))
-            sampling_job_queue.put((i, 'ts'))
+            sampling_job_queue.put((i, 'epsilon_greedy'))
+            sampling_job_queue.put((i, 'bayesian_ucb'))
 
         # Start tasks
         logger.debug('Running sampling tasks')
@@ -343,7 +333,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         # We want numpy arrays but instead have the weird custom process-safe arrays.
         # Since the rest of the code expects a numpy array we're going to replace the
         # elements in the dictionaries with their array counterparts.
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             with sampled_categories_dict[method].get_lock():
                 sampled_categories_dict[method] = sampled_categories_dict[method].get_array()
             with sampled_observations_dict[method].get_lock():
@@ -356,7 +346,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 sampled_indices_dict[method] = sampled_indices_dict[method].get_array()
 
         # Write to disk
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             np.save(args.output / experiment_name / ('sampled_categories_%s.npy' % method),
                     sampled_categories_dict[method])
             np.save(args.output / experiment_name / ('sampled_observations_%s.npy' % method),
@@ -366,7 +356,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             np.save(args.output / experiment_name / ('sampled_indices_%s.npy' % method), sampled_indices_dict[method])
     else:
         # load sampled categories, scores and observations from file
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             sampled_categories_dict[method] = np.load(
                 args.output / experiment_name / ('sampled_categories_%s.npy' % method))
             sampled_observations_dict[method] = np.load(
@@ -385,19 +375,19 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 run_idx, method = queue.get()
                 with process_lock:
                     logger.debug(f'Working on eval task :: Run: {run_idx} :: Method {method}')
-                agreement, ece, mrr = eval(args,
-                                           sampled_categories_dict[method][run_idx].tolist(),
-                                           sampled_observations_dict[method][run_idx].tolist(),
-                                           sampled_scores_dict[method][run_idx].tolist(),
-                                           sampled_labels_dict[method][run_idx].tolist(),
-                                           sampled_indices_dict[method][run_idx].tolist(),
-                                           ground_truth,
-                                           num_classes=num_classes,
-                                           holdout_categories=holdout_categories,
-                                           holdout_observations=holdout_observations,
-                                           holdout_confidences=holdout_confidences,
-                                           holdout_labels=holdout_labels,
-                                           holdout_indices=holdout_indices)
+                agreement, metric, noncum_metric, ece, mrr = eval(args,
+                                                                  sampled_categories_dict[method][run_idx].tolist(),
+                                                                  sampled_observations_dict[method][run_idx].tolist(),
+                                                                  sampled_scores_dict[method][run_idx].tolist(),
+                                                                  sampled_labels_dict[method][run_idx].tolist(),
+                                                                  sampled_indices_dict[method][run_idx].tolist(),
+                                                                  ground_truth,
+                                                                  num_classes=num_classes,
+                                                                  holdout_categories=holdout_categories,
+                                                                  holdout_observations=holdout_observations,
+                                                                  holdout_confidences=holdout_confidences,
+                                                                  holdout_labels=holdout_labels,
+                                                                  holdout_indices=holdout_indices)
 
                 # Write outputs
                 avg_num_agreement_array = avg_num_agreement_dict[method]
@@ -419,8 +409,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         logger.debug('Enqueueing evaluation tasks')
         eval_job_queue = JoinableQueue()
         for i in range(RUNS):
-            eval_job_queue.put((i, 'non-active'))
-            eval_job_queue.put((i, 'ts'))
+            eval_job_queue.put((i, 'epsilon_greedy'))
+            eval_job_queue.put((i, 'bayesian_ucb'))
 
         # Start tasks
         logger.debug('Running evaluation tasks')
@@ -435,7 +425,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
         # We want numpy arrays but instead have the weird custom process-safe arrays.
         # Since the rest of the code expects a numpy array we're going to replace the
         # elements in the dictionaries with their array counterparts.
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             with avg_num_agreement_dict[method].get_lock():
                 avg_num_agreement_dict[method] = avg_num_agreement_dict[method].get_array()
             with holdout_ece_dict[method].get_lock():
@@ -443,7 +433,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
             with mrr_dict[method].get_lock():
                 mrr_dict[method] = mrr_dict[method].get_array()
 
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             np.save(args.output / experiment_name / ('avg_num_agreement_%s.npy' % method),
                     avg_num_agreement_dict[method])
             np.save(args.output / experiment_name / ('mrr_%s.npy' % method), mrr_dict[method])
@@ -451,7 +441,7 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                     holdout_ece_dict[method])
 
     else:
-        for method in ['non-active', 'ts']:
+        for method in ['epsilon_greedy', 'bayesian_ucb']:
             avg_num_agreement_dict[method] = np.load(
                 args.output / experiment_name / ('avg_num_agreement_%s.npy' % method))
             mrr_dict[method] = np.load(
@@ -460,7 +450,8 @@ def main_calibration_error_topk(args: argparse.Namespace, SAMPLE=True, EVAL=True
                 args.output / experiment_name / ('holdout_ece_%s_%s.npy' % (args.calibration_model, method)))
 
     if PLOT:
-        comparison_plot(args, experiment_name, avg_num_agreement_dict, holdout_ece_dict, mrr_dict=mrr_dict)
+        comparison_plot(args, experiment_name, avg_num_agreement_dict, holdout_ece_dict, mrr_dict=mrr_dict,
+                        is_baseline=True)
 
 
 if __name__ == "__main__":
