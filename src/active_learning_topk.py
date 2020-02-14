@@ -398,7 +398,8 @@ def main_calibration_error_topk(args: argparse.Namespace, sample=True, eval=True
                                                holdout_observations=holdout_observations,
                                                holdout_confidences=holdout_confidences,
                                                holdout_labels=holdout_labels,
-                                               holdout_indices=holdout_indices)
+                                               holdout_indices=holdout_indices,
+                                               logits=logits)
 
                 # Write outputs
                 avg_num_agreement_array = avg_num_agreement_dict[method]

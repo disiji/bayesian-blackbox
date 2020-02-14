@@ -1,3 +1,6 @@
+#############################################################################################
+# ACTIVE LEARNING EXPERIMENTS
+#############################################################################################
 # topk accuracy expriments
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 1 -pseudocount=2 &
 python active_learning_topk.py cifar100 -metric accuracy -mode min -topk 10 -pseudocount=2 &
@@ -111,6 +114,10 @@ python active_learning_costs.py -topk 1 -type_cost superclass -pseudocount 10 &
 python active_learning_costs.py -topk 1 -type_cost superclass -pseudocount 100 &
 
 
+
+#############################################################################################
+# BAYESIAN RELIABILITY DIAGRAM EXPERIMENTS
+#############################################################################################
 # plot calibration error from bayesian/frequentist reliability diagrams
 python bayesian_reliability_comparison.py cifar100 -pseudocount 1 -ground_truth_type frequentist -weight_type pool &
 python bayesian_reliability_comparison.py imagenet -pseudocount 1 -ground_truth_type frequentist -weight_type pool &

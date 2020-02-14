@@ -122,7 +122,8 @@ def evaluate(args: argparse.Namespace,
              holdout_labels: List[int] = None,
              holdout_indices: List[int] = None,
              prior=None,
-             weight=None) -> Tuple[np.ndarray, ...]:
+             weight=None,
+             logits=None) -> Tuple[np.ndarray, ...]:
     """
     Evaluate topk ground truth agains predictions made by the model, which is trained on actively or
         non-actively selected samples.
@@ -154,8 +155,7 @@ def evaluate(args: argparse.Namespace,
 
         elif args.calibration_model in ['platt_scaling', 'temperature_scaling']:
             holdout_indices_array = np.array(holdout_indices, dtype=np.int)
-            with process_lock:
-                holdout_X = logits[holdout_indices_array]
+            holdout_X = logits[holdout_indices_array]
 
     topk_arms = np.zeros((num_classes,), dtype=np.bool_)
 
