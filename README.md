@@ -33,7 +33,7 @@ Predictions can be downloaded from [here](https://drive.google.com/drive/folders
 Run the Active Bayesian Assessor
 ---
 
-After downloading the data, updaet `DATA_DIR`, `RESULTS_DIR` and `FIGURE_DIR` and `src/data_utils.py` accordingly, to specify the input directory to read data from 
+After downloading the data, update `DATA_DIR`, `RESULTS_DIR` and `FIGURE_DIR` and `src/data_utils.py` accordingly, to specify the input directory to read data from 
 and the output output directory to write results and figures to.
 
 To reproduce all the experimental results and figures we reported in the paper, run commands in `script`. 
