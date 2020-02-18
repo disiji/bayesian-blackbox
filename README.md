@@ -2,7 +2,7 @@ Active Bayesian Assessment for Black-Box Classifiers
 ===
 
 This repo contains an implementation of the active Bayesian assessment models described in "Active Bayesian Assessment 
-for Black-Box Classifiers", Disi Ji, Robert L. Logan IV, Padhraic Smyth, Mark Steyvers. [[arXiv]](https://arxiv.org/abs/tbd).
+for Black-Box Classifiers", Disi Ji, Robert L. Logan IV, Padhraic Smyth, Mark Steyvers. [[arXiv]](https://arxiv.org/pdf/2002.06532.pdf).
 
 
 Setup
