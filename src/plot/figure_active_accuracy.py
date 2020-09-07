@@ -103,8 +103,8 @@ def plot_topk_accuracy(ax: mpl.axes.Axes,
                        'ts_uniform': 'TS (uninformative)', }
     else:
         benchmark = 'ts_uniform'
-        # method_list = {'non-active_no_prior', 'ts_uniform', 'epsilon_greedy_no_prior', 'bayesian_ucb_no_prior'}
-        method_list = {'non-active_no_prior', 'ts_uniform'}
+        method_list = {'non-active_no_prior', 'ts_uniform', 'epsilon_greedy_no_prior', 'bayesian_ucb_no_prior'}
+        # method_list = {'non-active_no_prior', 'ts_uniform'}
 
     for method in method_list:
         metric_eval = np.load(
